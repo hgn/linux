@@ -213,6 +213,9 @@ struct kvm {
 	unsigned long mmu_notifier_seq;
 	long mmu_notifier_count;
 #endif
+	struct timespec ref_ts;
+	unsigned time_machine_num;
+	unsigned time_machine_den;
 };
 
 /* The guest did something we don't support. */

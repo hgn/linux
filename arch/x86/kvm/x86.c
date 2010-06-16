@@ -834,6 +834,7 @@ static void kvm_write_guest_time(struct kvm_vcpu *v)
 	struct kvm_vcpu_arch *vcpu = &v->arch;
 	void *shared_kaddr;
 	unsigned long this_tsc_khz;
+	u64 diff;
 
 	if ((!vcpu->time_page))
 		return;
@@ -852,9 +853,12 @@ static void kvm_write_guest_time(struct kvm_vcpu *v)
 	monotonic_to_bootbased(&ts);
 	local_irq_restore(flags);
 
+	diff =  ktime_us_delta(timespec_to_ktime(ts), timespec_to_ktime(v->kvm->ref_ts));
+	diff = ((diff * v->kvm->time_machine_num) / v->kvm->time_machine_den) * MSEC_PER_SEC;
+
 	/* With all the info we got, fill in the values */
 
-	vcpu->hv_clock.system_time = ts.tv_nsec +
+	vcpu->hv_clock.system_time = ts.tv_nsec + diff +
 				     (NSEC_PER_SEC * (u64)ts.tv_sec) + v->kvm->arch.kvmclock_offset;
 
 	vcpu->hv_clock.flags = 0;
@@ -5357,6 +5361,12 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 	free_page((unsigned long)vcpu->arch.pio_data);
 }
 
+static void kvm_take_ref_time(struct kvm *kvm)
+{
+	ktime_get_ts(&kvm->ref_ts);
+}
+
+
 struct  kvm *kvm_arch_create_vm(void)
 {
 	struct kvm *kvm = kzalloc(sizeof(struct kvm), GFP_KERNEL);
@@ -5377,6 +5387,11 @@ struct  kvm *kvm_arch_create_vm(void)
 	set_bit(KVM_USERSPACE_IRQ_SOURCE_ID, &kvm->arch.irq_sources_bitmap);
 
 	rdtscll(kvm->arch.vm_init_tsc);
+
+	kvm_take_ref_time(kvm);
+
+	kvm->time_machine_num = 0;
+	kvm->time_machine_den = 1;
 
 	return kvm;
 }
