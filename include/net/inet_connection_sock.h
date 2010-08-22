@@ -170,9 +170,12 @@ static inline int inet_csk_ack_scheduled(const struct sock *sk)
 	return inet_csk(sk)->icsk_ack.pending & ICSK_ACK_SCHED;
 }
 
+extern int sysctl_tcp_quickack;
+
 static inline void inet_csk_delack_init(struct sock *sk)
 {
 	memset(&inet_csk(sk)->icsk_ack, 0, sizeof(inet_csk(sk)->icsk_ack));
+	inet_csk(sk)->icsk_ack.pingpong = sysctl_tcp_quickack ? 0 : 1;
 }
 
 extern void inet_csk_delete_keepalive_timer(struct sock *sk);

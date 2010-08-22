@@ -399,6 +399,13 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 	{
+		.procname	= "tcp_quickack",
+		.data		= &sysctl_tcp_quickack,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
 		.procname	= "tcp_mem",
 		.data		= &sysctl_tcp_mem,
 		.maxlen		= sizeof(sysctl_tcp_mem),
