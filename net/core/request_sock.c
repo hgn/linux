@@ -35,6 +35,9 @@
 int sysctl_max_syn_backlog = 256;
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 
+int sysctl_min_syn_backlog = 8;
+EXPORT_SYMBOL(sysctl_min_syn_backlog);
+
 int reqsk_queue_alloc(struct request_sock_queue *queue,
 		      unsigned int nr_table_entries)
 {
@@ -42,7 +45,7 @@ int reqsk_queue_alloc(struct request_sock_queue *queue,
 	struct listen_sock *lopt;
 
 	nr_table_entries = min_t(u32, nr_table_entries, sysctl_max_syn_backlog);
-	nr_table_entries = max_t(u32, nr_table_entries, 8);
+	nr_table_entries = max_t(u32, nr_table_entries, sysctl_min_syn_backlog);
 	nr_table_entries = roundup_pow_of_two(nr_table_entries + 1);
 	lopt_size += nr_table_entries * sizeof(struct request_sock *);
 	if (lopt_size > PAGE_SIZE)

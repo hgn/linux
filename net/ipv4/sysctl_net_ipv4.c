@@ -298,6 +298,13 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 	{
+		.procname	= "tcp_min_syn_backlog",
+		.data		= &sysctl_min_syn_backlog,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
 		.procname	= "ip_local_port_range",
 		.data		= &sysctl_local_ports.range,
 		.maxlen		= sizeof(sysctl_local_ports.range),

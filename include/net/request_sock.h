@@ -89,6 +89,7 @@ static inline void reqsk_free(struct request_sock *req)
 }
 
 extern int sysctl_max_syn_backlog;
+extern int sysctl_min_syn_backlog;
 
 /** struct listen_sock - listen state
  *
