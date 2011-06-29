@@ -465,6 +465,7 @@ enum {
 	TCA_NETEM_REORDER,
 	TCA_NETEM_CORRUPT,
 	TCA_NETEM_LOSS,
+	TCA_NETEM_CGM_CORRUPT,
 	__TCA_NETEM_MAX,
 };
 
@@ -496,12 +497,12 @@ struct tc_netem_corrupt {
 };
 
 enum {
-	NETEM_LOSS_UNSPEC,
-	NETEM_LOSS_GI,		/* General Intuitive - 4 state model */
-	NETEM_LOSS_GE,		/* Gilbert Elliot models */
-	__NETEM_LOSS_MAX
+	NETEM_CGM_UNSPEC,
+	NETEM_CGM_GI,		/* General Intuitive - 4 state model */
+	NETEM_CGM_GE,		/* Gilbert Elliot models */
+	__NETEM_CGM_MAX
 };
-#define NETEM_LOSS_MAX (__NETEM_LOSS_MAX - 1)
+#define NETEM_CGM_MAX (__NETEM_CGM_MAX - 1)
 
 /* State transition probablities for 4 state model */
 struct tc_netem_gimodel {

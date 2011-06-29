@@ -65,6 +65,12 @@
 		 Fabio Ludovici <fabio.ludovici at yahoo.it>
 */
 
+enum cgm_model_type {
+	CGM_LOSS_MODEL = 0,
+	CGM_CORRUPTION_MODEL,
+	CGM_MODEL_MAX
+};
+
 struct netem_sched_data {
 	struct Qdisc	*qdisc;
 	struct qdisc_watchdog watchdog;
@@ -91,15 +97,15 @@ struct netem_sched_data {
 	} *delay_dist;
 
 	enum  {
-		CLG_RANDOM,
-		CLG_4_STATES,
-		CLG_GILB_ELL,
-	} loss_model;
+		CGM_RANDOM,
+		CGM_4_STATES,
+		CGM_GILB_ELL,
+	} cgm_model[CGM_MODEL_MAX];
 
 	/* Correlated Loss Generation models */
-	struct clgstate {
+	struct cgm_state {
 		/* state of the Markov chain */
-		u8 state;
+		u8 markov_state;
 
 		/* 4-states and Gilbert-Elliot models */
 		u32 a1;	/* p13 for 4-states or p for GE */
@@ -107,7 +113,7 @@ struct netem_sched_data {
 		u32 a3;	/* p32 for 4-states or h for GE */
 		u32 a4;	/* p14 for 4-states or 1-k for GE */
 		u32 a5; /* p23 used only in 4-states */
-	} clg;
+	} cgm_state[CGM_MODEL_MAX];
 
 };
 
@@ -151,13 +157,28 @@ static u32 get_crandom(struct crndstate *state)
 	return answer;
 }
 
-/* loss_4state - 4-state model loss generator
- * Generates losses according to the 4-state Markov chain adopted in
- * the GI (General and Intuitive) loss model.
- */
-static bool loss_4state(struct netem_sched_data *q)
+static bool eval_random_event(struct netem_sched_data *q, int model)
 {
-	struct clgstate *clg = &q->clg;
+       switch (model) {
+       case CGM_LOSS_MODEL:
+               return q->loss && q->loss >= get_crandom(&q->loss_cor);
+       case CGM_CORRUPTION_MODEL:
+               return q->corrupt && q->corrupt >= get_crandom(&q->corrupt_cor);
+       }
+
+       BUG();
+
+       return false;
+}
+
+
+/* eval_4state_event - 4-state model loss generator
+ * Generates true or false according to the 4-state Markov
+ * chain adopted in the GI (General and Intuitive) loss model.
+ */
+static bool eval_4state_event(struct netem_sched_data *q, enum cgm_model_type model)
+{
+	struct cgm_state *cgm = &q->cgm_state[model];
 	u32 rnd = net_random();
 
 	/*
@@ -170,97 +191,96 @@ static bool loss_4state(struct netem_sched_data *q)
 	 *   3 => lost packets within a burst period
 	 *   2 => successfully transmitted packets within a burst period
 	 */
-	switch (clg->state) {
+	switch (cgm->markov_state) {
 	case 1:
-		if (rnd < clg->a4) {
-			clg->state = 4;
+		if (rnd < cgm->a4) {
+			cgm->markov_state = 4;
 			return true;
-		} else if (clg->a4 < rnd && rnd < clg->a1) {
-			clg->state = 3;
+		} else if (cgm->a4 < rnd && rnd < cgm->a1) {
+			cgm->markov_state = 3;
 			return true;
-		} else if (clg->a1 < rnd)
-			clg->state = 1;
+		} else if (cgm->a1 < rnd)
+			cgm->markov_state = 1;
 
 		break;
 	case 2:
-		if (rnd < clg->a5) {
-			clg->state = 3;
+		if (rnd < cgm->a5) {
+			cgm->markov_state = 3;
 			return true;
 		} else
-			clg->state = 2;
+			cgm->markov_state = 2;
 
 		break;
 	case 3:
-		if (rnd < clg->a3)
-			clg->state = 2;
-		else if (clg->a3 < rnd && rnd < clg->a2 + clg->a3) {
-			clg->state = 1;
+		if (rnd < cgm->a3)
+			cgm->markov_state = 2;
+		else if (cgm->a3 < rnd && rnd < cgm->a2 + cgm->a3) {
+			cgm->markov_state = 1;
 			return true;
-		} else if (clg->a2 + clg->a3 < rnd) {
-			clg->state = 3;
+		} else if (cgm->a2 + cgm->a3 < rnd) {
+			cgm->markov_state = 3;
 			return true;
 		}
 		break;
 	case 4:
-		clg->state = 1;
+		cgm->markov_state = 1;
 		break;
 	}
 
 	return false;
 }
 
-/* loss_gilb_ell - Gilbert-Elliot model loss generator
- * Generates losses according to the Gilbert-Elliot loss model or
+/* eval_gilb_ell_event - Gilbert-Elliot model generator
+ * Generates true or false event according to the Gilbert-Elliot model or
  * its special cases  (Gilbert or Simple Gilbert)
  *
  * Makes a comparison between random number and the transition
  * probabilities outgoing from the current state, then decides the
  * next state. A second random number is extracted and the comparison
- * with the loss probability of the current state decides if the next
+ * with the probability of the current state decides if the next
  * packet will be transmitted or lost.
  */
-static bool loss_gilb_ell(struct netem_sched_data *q)
+static bool eval_gilb_ell_event(struct netem_sched_data *q, enum cgm_model_type model)
 {
-	struct clgstate *clg = &q->clg;
+	struct cgm_state *cgm = &q->cgm_state[model];
 
-	switch (clg->state) {
+	switch (cgm->markov_state) {
 	case 1:
-		if (net_random() < clg->a1)
-			clg->state = 2;
-		if (net_random() < clg->a4)
+		if (net_random() < cgm->a1)
+			cgm->markov_state = 2;
+		if (net_random() < cgm->a4)
 			return true;
 	case 2:
-		if (net_random() < clg->a2)
-			clg->state = 1;
-		if (clg->a3 > net_random())
+		if (net_random() < cgm->a2)
+			cgm->markov_state = 1;
+		if (cgm->a3 > net_random())
 			return true;
 	}
 
 	return false;
 }
 
-static bool loss_event(struct netem_sched_data *q)
+static bool eval_event(struct netem_sched_data *q, enum cgm_model_type model)
 {
-	switch (q->loss_model) {
-	case CLG_RANDOM:
-		/* Random packet drop 0 => none, ~0 => all */
-		return q->loss && q->loss >= get_crandom(&q->loss_cor);
+	switch (q->cgm_model[model]) {
+	case CGM_RANDOM:
+		return eval_random_event(q, model);
 
-	case CLG_4_STATES:
+	case CGM_4_STATES:
 		/* 4state loss model algorithm (used also for GI model)
-		* Extracts a value from the markov 4 state loss generator,
+		* Extracts a value from the markov 4 state generator,
 		* if it is 1 drops a packet and if needed writes the event in
 		* the kernel logs
 		*/
-		return loss_4state(q);
+		return eval_4state_event(q, model);
 
-	case CLG_GILB_ELL:
+	case CGM_GILB_ELL:
 		/* Gilbert-Elliot loss model algorithm
-		* Extracts a value from the Gilbert-Elliot loss generator,
+		* Extracts a value from the Gilbert-Elliot generator,
 		* if it is 1 drops a packet and if needed writes the event in
 		* the kernel logs
 		*/
-		return loss_gilb_ell(q);
+		return eval_gilb_ell_event(q, model);
 	}
 
 	return false;	/* not reached */
@@ -317,8 +337,12 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	if (q->duplicate && q->duplicate >= get_crandom(&q->dup_cor))
 		++count;
 
+	if (eval_event(q, CGM_CORRUPTION_MODEL)) {
+		skb->data[net_random() % skb_headlen(skb)] ^= 1<<(net_random() % 8);
+	}
+
 	/* Drop packet? */
-	if (loss_event(q))
+	if (eval_event(q, CGM_LOSS_MODEL))
 		--count;
 
 	if (count == 0) {
@@ -535,7 +559,7 @@ static void get_corrupt(struct Qdisc *sch, const struct nlattr *attr)
 	init_crandom(&q->corrupt_cor, r->correlation);
 }
 
-static int get_loss_clg(struct Qdisc *sch, const struct nlattr *attr)
+static int get_cgm(struct Qdisc *sch, const struct nlattr *attr, enum cgm_model_type model)
 {
 	struct netem_sched_data *q = qdisc_priv(sch);
 	const struct nlattr *la;
@@ -545,7 +569,8 @@ static int get_loss_clg(struct Qdisc *sch, const struct nlattr *attr)
 		u16 type = nla_type(la);
 
 		switch(type) {
-		case NETEM_LOSS_GI: {
+		case NETEM_CGM_GI:
+			{
 			const struct tc_netem_gimodel *gi = nla_data(la);
 
 			if (nla_len(la) != sizeof(struct tc_netem_gimodel)) {
@@ -553,18 +578,19 @@ static int get_loss_clg(struct Qdisc *sch, const struct nlattr *attr)
 				return -EINVAL;
 			}
 
-			q->loss_model = CLG_4_STATES;
+			q->cgm_model[model] = CGM_4_STATES;
 
-			q->clg.state = 1;
-			q->clg.a1 = gi->p13;
-			q->clg.a2 = gi->p31;
-			q->clg.a3 = gi->p32;
-			q->clg.a4 = gi->p14;
-			q->clg.a5 = gi->p23;
+			q->cgm_state[model].markov_state = 1;
+			q->cgm_state[model].a1 = gi->p13;
+			q->cgm_state[model].a2 = gi->p31;
+			q->cgm_state[model].a3 = gi->p32;
+			q->cgm_state[model].a4 = gi->p14;
+			q->cgm_state[model].a5 = gi->p23;
 			break;
 		}
 
-		case NETEM_LOSS_GE: {
+		case NETEM_CGM_GE:
+			{
 			const struct tc_netem_gemodel *ge = nla_data(la);
 
 			if (nla_len(la) != sizeof(struct tc_netem_gemodel)) {
@@ -572,17 +598,17 @@ static int get_loss_clg(struct Qdisc *sch, const struct nlattr *attr)
 				return -EINVAL;
 			}
 
-			q->loss_model = CLG_GILB_ELL;
-			q->clg.state = 1;
-			q->clg.a1 = ge->p;
-			q->clg.a2 = ge->r;
-			q->clg.a3 = ge->h;
-			q->clg.a4 = ge->k1;
+			q->cgm_model[model] = CGM_GILB_ELL;
+			q->cgm_state[model].markov_state = 1;
+			q->cgm_state[model].a1 = ge->p;
+			q->cgm_state[model].a2 = ge->r;
+			q->cgm_state[model].a3 = ge->h;
+			q->cgm_state[model].a4 = ge->k1;
 			break;
 		}
 
 		default:
-			pr_info("netem: unknown loss type %u\n", type);
+			pr_info("netem: unknown cgm type %u\n", type);
 			return -EINVAL;
 		}
 	}
@@ -595,6 +621,7 @@ static const struct nla_policy netem_policy[TCA_NETEM_MAX + 1] = {
 	[TCA_NETEM_REORDER]	= { .len = sizeof(struct tc_netem_reorder) },
 	[TCA_NETEM_CORRUPT]	= { .len = sizeof(struct tc_netem_corrupt) },
 	[TCA_NETEM_LOSS]	= { .type = NLA_NESTED },
+	[TCA_NETEM_CGM_CORRUPT] = { .type = NLA_NESTED },
 };
 
 static int parse_attr(struct nlattr *tb[], int maxtype, struct nlattr *nla,
@@ -666,9 +693,13 @@ static int netem_change(struct Qdisc *sch, struct nlattr *opt)
 	if (tb[TCA_NETEM_CORRUPT])
 		get_corrupt(sch, tb[TCA_NETEM_CORRUPT]);
 
-	q->loss_model = CLG_RANDOM;
+	q->cgm_model[CGM_LOSS_MODEL] = CGM_RANDOM;
 	if (tb[TCA_NETEM_LOSS])
-		ret = get_loss_clg(sch, tb[TCA_NETEM_LOSS]);
+		ret = get_cgm(sch, tb[TCA_NETEM_LOSS], CGM_LOSS_MODEL);
+
+	q->cgm_model[CGM_CORRUPTION_MODEL] = CGM_RANDOM;
+	if (tb[TCA_NETEM_CORRUPT])
+		ret = get_cgm(sch, tb[TCA_NETEM_CORRUPT], CGM_CORRUPTION_MODEL);
 
 	return ret;
 }
@@ -765,7 +796,8 @@ static int netem_init(struct Qdisc *sch, struct nlattr *opt)
 
 	qdisc_watchdog_init(&q->watchdog, sch);
 
-	q->loss_model = CLG_RANDOM;
+	q->cgm_model[CGM_LOSS_MODEL] = CGM_RANDOM;
+	q->cgm_model[CGM_CORRUPTION_MODEL] = CGM_RANDOM;
 	q->qdisc = qdisc_create_dflt(sch->dev_queue, &tfifo_qdisc_ops,
 				     TC_H_MAKE(sch->handle, 1));
 	if (!q->qdisc) {
@@ -790,42 +822,42 @@ static void netem_destroy(struct Qdisc *sch)
 	dist_free(q->delay_dist);
 }
 
-static int dump_loss_model(const struct netem_sched_data *q,
-			   struct sk_buff *skb)
+static int dump_cgm_model(const struct netem_sched_data *q,
+			   struct sk_buff *skb, int type, enum cgm_model_type model)
 {
 	struct nlattr *nest;
 
-	nest = nla_nest_start(skb, TCA_NETEM_LOSS);
+	nest = nla_nest_start(skb, type);
 	if (nest == NULL)
 		goto nla_put_failure;
 
-	switch (q->loss_model) {
-	case CLG_RANDOM:
+	switch (q->cgm_model[model]) {
+	case CGM_RANDOM:
 		/* legacy loss model */
 		nla_nest_cancel(skb, nest);
 		return 0;	/* no data */
 
-	case CLG_4_STATES: {
+	case CGM_4_STATES: {
 		struct tc_netem_gimodel gi = {
-			.p13 = q->clg.a1,
-			.p31 = q->clg.a2,
-			.p32 = q->clg.a3,
-			.p14 = q->clg.a4,
-			.p23 = q->clg.a5,
+			.p13 = q->cgm_state[model].a1,
+			.p31 = q->cgm_state[model].a2,
+			.p32 = q->cgm_state[model].a3,
+			.p14 = q->cgm_state[model].a4,
+			.p23 = q->cgm_state[model].a5,
 		};
 
-		NLA_PUT(skb, NETEM_LOSS_GI, sizeof(gi), &gi);
+		NLA_PUT(skb, NETEM_CGM_GI, sizeof(gi), &gi);
 		break;
 	}
-	case CLG_GILB_ELL: {
+	case CGM_GILB_ELL: {
 		struct tc_netem_gemodel ge = {
-			.p = q->clg.a1,
-			.r = q->clg.a2,
-			.h = q->clg.a3,
-			.k1 = q->clg.a4,
+			.p  = q->cgm_state[model].a1,
+			.r  = q->cgm_state[model].a2,
+			.h  = q->cgm_state[model].a3,
+			.k1 = q->cgm_state[model].a4,
 		};
 
-		NLA_PUT(skb, NETEM_LOSS_GE, sizeof(ge), &ge);
+		NLA_PUT(skb, NETEM_CGM_GE, sizeof(ge), &ge);
 		break;
 	}
 	}
@@ -868,7 +900,10 @@ static int netem_dump(struct Qdisc *sch, struct sk_buff *skb)
 	corrupt.correlation = q->corrupt_cor.rho;
 	NLA_PUT(skb, TCA_NETEM_CORRUPT, sizeof(corrupt), &corrupt);
 
-	if (dump_loss_model(q, skb) != 0)
+	if (dump_cgm_model(q, skb, TCA_NETEM_LOSS, CGM_LOSS_MODEL) != 0)
+		goto nla_put_failure;
+
+	if (dump_cgm_model(q, skb, TCA_NETEM_CGM_CORRUPT, CGM_CORRUPTION_MODEL) != 0)
 		goto nla_put_failure;
 
 	return nla_nest_end(skb, nla);
