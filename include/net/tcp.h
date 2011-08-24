@@ -520,6 +520,8 @@ static inline void tcp_bound_rto(const struct sock *sk)
 {
 	if (inet_csk(sk)->icsk_rto > TCP_RTO_MAX)
 		inet_csk(sk)->icsk_rto = TCP_RTO_MAX;
+	else if (inet_csk(sk)->icsk_rto < TCP_RTO_MIN)
+		inet_csk(sk)->icsk_rto = TCP_RTO_MIN;
 }
 
 static inline u32 __tcp_set_rto(const struct tcp_sock *tp)
