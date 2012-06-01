@@ -1,0 +1,49 @@
+
+/* https://live.gnome.org/GnomeArt/Tutorials/GtkThemes#head-ce0e81cf1c2f50f83887d8957adcb0ef70749900 */
+style "default-style"
+{
+        # modify the x/ythickness, used for spacing all over the place
+        xthickness = 1
+        ythickness = 1
+
+				font = "DejaVu Sans 8"
+
+        # one can set so called "style properties"
+        GtkRange::slider-width = 15
+
+        bg[NORMAL]   = "#333333"
+        fg[NORMAL]   = "#cccccc"
+        text[NORMAL] = "#999999"
+        base[NORMAL] = "#222222"
+
+        bg[PRELIGHT]   = "#222222"
+        fg[PRELIGHT]   = "#eeeeee"
+        text[PRELIGHT] = "#333333"
+        base[PRELIGHT] = "#0000ff"
+
+        bg[ACTIVE]   = "#222222"
+        fg[ACTIVE]   = "#888888"
+        text[ACTIVE] = "#ff0000"
+        base[ACTIVE] = "#ff0000"
+
+        bg[INSENSITIVE]   = "#0000ff"
+        fg[INSENSITIVE]   = "#0000ff"
+        text[INSENSITIVE] = "#0000ff"
+        base[INSENSITIVE] = "#0000ff"
+
+        bg[SELECTED]   = "#00ff00"
+        fg[SELECTED]   = "#343454"
+        text[SELECTED] = "#eeeeee"
+        base[SELECTED] = "#555555"
+}
+
+class "GtkWidget" style "default-style"
+
+
+
+style "font"
+{
+	font_name = "DejaVu Sans 8"
+}
+widget_class "*" style "font"
+gtk-font-name = "DejaVu Sans 8"

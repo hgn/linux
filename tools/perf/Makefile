@@ -523,9 +523,14 @@ else
 		BASIC_CFLAGS += -DNO_GTK2_SUPPORT
 	else
 		BASIC_CFLAGS += $(shell pkg-config --cflags gtk+-2.0)
-		EXTLIBS += $(shell pkg-config --libs gtk+-2.0)
+		BASIC_CFLAGS += $(shell pkg-config --cflags libxml-2.0)
+		BASIC_CFLAGS += -Wno-strict-prototypes #-DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED -DGSEAL_ENABLE
+		EXTLIBS += $(shell pkg-config --libs gtk+-2.0) $(shell pkg-config --libs libxml-2.0)
 		LIB_OBJS += $(OUTPUT)ui/gtk/browser.o
 		LIB_OBJS += $(OUTPUT)ui/gtk/setup.o
+		LIB_OBJS += $(OUTPUT)builtin-studio.o
+		LIB_OBJS += $(OUTPUT)studio-db.o
+		LIB_OBJS += $(OUTPUT)studio-assistant.o
 		# Make sure that it'd be included only once.
 		ifneq ($(findstring -DNO_NEWT_SUPPORT,$(BASIC_CFLAGS)),)
 			LIB_OBJS += $(OUTPUT)ui/setup.o
@@ -937,6 +942,12 @@ install: all
 	$(INSTALL) scripts/python/Perf-Trace-Util/lib/Perf/Trace/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/scripts/python/Perf-Trace-Util/lib/Perf/Trace'
 	$(INSTALL) scripts/python/*.py -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/scripts/python'
 	$(INSTALL) scripts/python/bin/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/scripts/python/bin'
+	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/dark'
+	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/light'
+	$(INSTALL) share/pixmaps/light/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/light'
+	$(INSTALL) share/pixmaps/dark/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/dark'
+	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/24x24'
+	$(INSTALL) share/pixmaps/buttons/24x24/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/24x24'
 
 install-python_ext:
 	$(PYTHON_WORD) util/setup.py --quiet install --root='/$(DESTDIR_SQ)'

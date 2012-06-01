@@ -4,6 +4,9 @@
 
 void setup_browser(bool fallback_to_pager)
 {
+	if (use_browser == 3)
+		return;
+
 	if (!isatty(1) || dump_trace)
 		use_browser = 0;
 

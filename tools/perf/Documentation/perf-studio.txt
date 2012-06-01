@@ -1,0 +1,21 @@
+perf-studio(1)
+===============
+
+NAME
+----
+perf-studio - Wrapper around perf for easy management
+
+SYNOPSIS
+--------
+[verse]
+'perf studio' [file]
+
+DESCRIPTION
+-----------
+No Description at the moment
+
+
+SEE ALSO
+--------
+linkperf:perf-record[1], linkperf:perf-buildid-list[1], linkperf:perf-report[1]
+

@@ -20,6 +20,7 @@
 #include "util/values.h"
 
 #include "perf.h"
+#include "builtin-studio.h"
 #include "util/debug.h"
 #include "util/evlist.h"
 #include "util/evsel.h"
@@ -40,7 +41,7 @@ struct perf_report {
 	struct perf_tool	tool;
 	struct perf_session	*session;
 	char const		*input_name;
-	bool			force, use_tui, use_gtk, use_stdio;
+	bool			force, use_tui, use_gtk, use_stdio, use_studio;
 	bool			hide_unresolved;
 	bool			dont_use_callchains;
 	bool			show_full_info;
@@ -429,6 +430,9 @@ static int __cmd_report(struct perf_report *rep)
 		} else if (use_browser == 2) {
 			perf_evlist__gtk_browse_hists(session->evlist, help,
 						      NULL, NULL, 0);
+		} else if (use_browser == 3) {
+			perf_evlist__studio_browse_hists(session->evlist, help,
+					NULL, NULL, 0);
 		}
 	} else
 		perf_evlist__tty_browse_hists(session->evlist, rep, help);
@@ -589,6 +593,8 @@ int cmd_report(int argc, const char **argv, const char *prefix __used)
 	OPT_BOOLEAN(0, "gtk", &report.use_gtk, "Use the GTK2 interface"),
 	OPT_BOOLEAN(0, "stdio", &report.use_stdio,
 		    "Use the stdio interface"),
+	OPT_BOOLEAN(0, "studio", &report.use_studio,
+		    "Workaround, don't use directly"),
 	OPT_STRING('s', "sort", &sort_order, "key[,key2...]",
 		   "sort by key(s): pid, comm, dso, symbol, parent, dso_to,"
 		   " dso_from, symbol_to, symbol_from, mispredict"),
@@ -646,6 +652,8 @@ int cmd_report(int argc, const char **argv, const char *prefix __used)
 		use_browser = 1;
 	else if (report.use_gtk)
 		use_browser = 2;
+	else if (report.use_stdio)
+		use_browser = 3;
 
 	if (report.inverted_callchain)
 		callchain_param.order = ORDER_CALLER;
@@ -681,9 +689,10 @@ int cmd_report(int argc, const char **argv, const char *prefix __used)
 
 	}
 
-	if (strcmp(report.input_name, "-") != 0)
-		setup_browser(true);
-	else
+	if (strcmp(report.input_name, "-") != 0) {
+		if (use_browser != 3)
+			setup_browser(true);
+	} else
 		use_browser = 0;
 
 	/*
