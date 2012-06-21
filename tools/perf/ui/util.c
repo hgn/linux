@@ -212,7 +212,7 @@ int __ui__warning(const char *title, const char *format, va_list args)
 {
 	char *s;
 
-	if (use_browser > 0 && vasprintf(&s, format, args) > 0) {
+	if (use_browser > 0 && use_browser != 3 && vasprintf(&s, format, args) > 0) {
 		int key;
 
 		pthread_mutex_lock(&ui__lock);
