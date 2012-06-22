@@ -59,6 +59,9 @@
 #include "builtin-studio.h"
 #include "studio-db.h"
 #include "studio-assistant.h"
+#include "studio-utils.h"
+#include "studio-status-widget.h"
+#include "studio-module.h"
 
 #define MAX_COLUMNS                       32
 
@@ -77,6 +80,8 @@ enum {
 struct studio_context sc;
 
 static void screen_err_msg(const gchar *format, ...);
+static void control_window_reload_new_project(struct studio_context *, gchar *path);
+
 
 
 enum {
@@ -305,6 +310,8 @@ static int studio_init(void)
 	if (!pw || !pw->pw_dir)
 		return -EINVAL;
 
+	memset(&sc, 0, sizeof(sc));
+
 	sc.homedirpath = strdup(pw->pw_dir);
 	if (!sc.homedirpath)
 		return -ENOMEM;
@@ -320,11 +327,11 @@ static int studio_init(void)
 	switch (sc.screen.theme) {
 	case THEME_COLOR_DARK:
 		sc.pixmapdir = g_strdup_printf("%s/%s", exec_path, "share/pixmaps/dark/");
-		sc.buttondir = g_strdup_printf("%s/%s", exec_path, "share/pixmaps/buttons/24x24/");
+		sc.buttondir = g_strdup_printf("%s/%s", exec_path, "share/pixmaps/buttons/16x16/");
 		break;
 	default:
 		sc.pixmapdir = g_strdup_printf("%s/%s", exec_path, "share/pixmaps/light/");
-		sc.buttondir = g_strdup_printf("%s/%s", exec_path, "share/pixmaps/buttons/24x24/");
+		sc.buttondir = g_strdup_printf("%s/%s", exec_path, "share/pixmaps/buttons/16x16/");
 		break;
 	}
 
@@ -1236,21 +1243,6 @@ GtkWidget *schart_new(void)
 
 
 
-static GdkPixbuf *load_pixbuf_from_file(const char *filename)
-{
-    GError *gerror = NULL;
-    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(filename, &gerror);
-
-    if (pixbuf == NULL) {
-        g_print("Error loading file: %d : %s\n", gerror->code, gerror->message);
-        g_error_free(gerror);
-        exit(1);
-    }
-
-    return pixbuf;
-}
-
-
 /*
  * No matter what exit path is taken,
  * this function must called for sure
@@ -1278,36 +1270,9 @@ static gboolean screen_quit(GtkWidget *widget, GtkWidget *event, gpointer data)
 	return TRUE;
 }
 
-enum
-{
-	LIST_ITEM = 0,
-	N_COLUMNS
-};
-
-GtkWidget *list;
 
 
 
-
-static void init_list(GtkWidget *gtlist)
-{
-
-	GtkCellRenderer    *renderer;
-	GtkTreeViewColumn  *column;
-	GtkListStore       *store;
-
-	renderer = gtk_cell_renderer_text_new();
-	column = gtk_tree_view_column_new_with_attributes("List Item",
-			renderer, "text", LIST_ITEM, NULL);
-	gtk_tree_view_append_column(GTK_TREE_VIEW (gtlist), column);
-
-	store = gtk_list_store_new (N_COLUMNS, G_TYPE_STRING);
-
-	gtk_tree_view_set_model(GTK_TREE_VIEW (gtlist),
-			GTK_TREE_MODEL(store));
-
-	g_object_unref(store);
-}
 
 
 static void screen_err_msg(const gchar *format, ...)
@@ -1328,55 +1293,7 @@ static void screen_err_msg(const gchar *format, ...)
 }
 
 
-static void addd(void) {
-	GtkListStore *store;
-	GtkTreeIter  iter;
 
-	const char *str = "fpp";
-
-	store = GTK_LIST_STORE(gtk_tree_view_get_model(
-				GTK_TREE_VIEW(list)));
-
-	gtk_list_store_append(store, &iter);
-	gtk_list_store_set(store, &iter, LIST_ITEM, str, -1);
-}
-
-
-static GtkWidget *gt(void)
-{
-
-
-
-	GtkTreeSelection *selection;
-
-
-	sc.screen.sw = gtk_scrolled_window_new(NULL, NULL);
-	list = gtk_tree_view_new();
-
-
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(sc.screen.sw),
-			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-	gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW(sc.screen.sw),
-			GTK_SHADOW_ETCHED_IN);
-
-	gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (list), TRUE);
-
-
-	gtk_container_add(GTK_CONTAINER (sc.screen.sw), list);
-
-	init_list(list);
-	addd();
-
-	selection  = gtk_tree_view_get_selection(GTK_TREE_VIEW(list));
-	(void) selection;
-
-
-	gtk_widget_show_all(sc.screen.sw);
-
-	return sc.screen.sw;
-
-}
 
 static void perf_gtk_signal(int sig)
 {
@@ -1946,9 +1863,7 @@ static void perf_run_dialog_window(GtkToolButton *toolbutton, gpointer user_data
 	return;
 }
 
-
-
-
+#if 0
 static void screen_toolbar_init(void)
 {
 
@@ -1987,103 +1902,10 @@ static void screen_toolbar_init(void)
 
 	return;
 }
-
-static void screen_nootbook_status_init(GtkWidget *notebook)
-{
-	GtkWidget *frame;
-	GtkWidget *label;
-	GtkWidget *vbox;
-	GdkPixbuf *image = NULL;
-	GtkWidget *widget = NULL;
-
-	vbox = gtk_vbox_new(FALSE, 0);
-
-	image = load_pixbuf_from_file ("lstopo.png");
-	widget = gtk_image_new_from_pixbuf (image);
+#endif
 
 
-	frame = gtk_frame_new("Machine Memory Hierarchy");
-	screen_apply_theme_to_widget(frame);
-	gtk_container_set_border_width(GTK_CONTAINER (frame), 2);
-	gtk_widget_set_size_request (frame, 100, 75);
 
-	gtk_container_add (GTK_CONTAINER (frame), widget);
-
-
-	gtk_widget_show(widget);
-	gtk_widget_show(frame);
-
-	gtk_box_pack_start(GTK_BOX(vbox), frame, TRUE, TRUE, 0);
-	gtk_widget_show(vbox);
-
-	frame = gtk_frame_new("Status Page");
-	screen_apply_theme_to_widget(frame);
-	gtk_container_set_border_width(GTK_CONTAINER (frame), 2);
-	gtk_widget_set_size_request (frame, 100, 75);
-	gtk_widget_show(frame);
-
-	gtk_box_pack_start(GTK_BOX(vbox), frame, TRUE, TRUE, 0);
-	gtk_widget_show(vbox);
-
-
-	label = gtk_label_new ("Project History");
-	screen_apply_theme_to_widget(label);
-	gtk_container_add(GTK_CONTAINER (frame), label);
-	gtk_widget_show(label);
-
-
-	label = gtk_label_new("Project History");
-	gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK (notebook), label, TRUE);
-	gtk_notebook_append_page(GTK_NOTEBOOK (notebook), vbox, label);
-}
-
-
-static void screen_nootbook_cbs_init(GtkWidget *notebook)
-{
-	GtkWidget *frame;
-	GtkWidget *tabContainer, *tabCloseButton, *tabLabel;
-
-	frame = gt();
-
-	tabLabel = gtk_label_new("Counter Based Sampling");
-	tabContainer = gtk_hbox_new(FALSE, 3);
-	tabCloseButton = gtk_button_new();
-
-	gtk_button_set_relief(GTK_BUTTON(tabCloseButton), GTK_RELIEF_NONE);
-
-	gtk_box_pack_start(GTK_BOX(tabContainer), tabLabel, TRUE, TRUE, 0);
-	gtk_box_pack_start(GTK_BOX(tabContainer), tabCloseButton, FALSE, FALSE, 0);
-
-
-	gtk_container_add(GTK_CONTAINER(tabCloseButton),
-			  gtk_image_new_from_stock(GTK_STOCK_CLOSE, GTK_ICON_SIZE_SMALL_TOOLBAR));
-	gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK (notebook), tabContainer, TRUE);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), frame, tabContainer);
-
-	gtk_widget_show_all(tabContainer);
-}
-
-
-static void screen_nootbook_ebs_init(GtkWidget *notebook)
-{
-	GtkWidget *frame;
-	GtkWidget *label;
-
-	frame = gtk_frame_new ("Counter Based Sampling");
-	screen_apply_theme_to_widget(frame);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 2);
-	gtk_widget_set_size_request (frame, 100, 75);
-	gtk_widget_show (frame);
-
-	label = gtk_label_new ("Counter Based Sampling");
-	screen_apply_theme_to_widget(label);
-	gtk_container_add (GTK_CONTAINER (frame), label);
-	gtk_widget_show (label);
-
-	label = gtk_label_new ("Event base sampling");
-	screen_apply_theme_to_widget(label);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), frame, label);
-}
 
 
 /* FIXME: add prefix for functions */
@@ -2220,9 +2042,7 @@ static GtkWidget *screen_nootbook_thread_analyzer_buttonbox_new(void)
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
 
 
-
 	gtk_widget_show_all(hbox);
-
 
 	return hbox;
 }
@@ -2401,12 +2221,66 @@ static GtkWidget *screen_nootbook_thread_analyzer_right_new(GtkWidget *paned)
 	return eventbox;
 }
 
+static GtkWidget *screen_nootbook_thread_analyzer_control(void)
+{
+	GtkWidget *hbox;
+	GtkWidget *button;
+	GtkWidget *image;
+	GtkWidget *label;
+	char image_path[PATH_MAX];
 
-static void screen_nootbook_thread_analyzer_init(GtkWidget *notebook)
+	hbox = gtk_hbox_new(FALSE, 0);
+
+	label = gtk_label_new(NULL);
+	gtk_label_set_markup(GTK_LABEL(label),
+			"<span  size=\"x-large\" font_weight=\"normal\" foreground=\"#666\"> Futex Analyzer </span>");
+	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
+
+	button = gtk_button_new();
+	/* also nice gnome-cpu-frequency-applet.png */
+	snprintf(image_path, sizeof(image_path), "%s%s", sc.buttondir, "preferences-desktop.png");
+	image = gtk_image_new_from_file(image_path);
+	gtk_button_set_image(GTK_BUTTON(button), image);
+	gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+	gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 5);
+
+	button = gtk_button_new();
+	/* also nice gnome-cpu-frequency-applet.png */
+	snprintf(image_path, sizeof(image_path), "%s%s", sc.buttondir, "elisa.png");
+	image = gtk_image_new_from_file(image_path);
+	gtk_button_set_image(GTK_BUTTON(button), image);
+	gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+	gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 5);
+
+	button = gtk_button_new();
+	/* also nice gnome-cpu-frequency-applet.png */
+	snprintf(image_path, sizeof(image_path), "%s%s", sc.buttondir, "gnome-cpu-frequency-applet.png");
+	image = gtk_image_new_from_file(image_path);
+	gtk_button_set_image(GTK_BUTTON(button), image);
+	gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+	gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 5);
+
+	button = gtk_button_new();
+	/* also nice gnome-cpu-frequency-applet.png */
+	snprintf(image_path, sizeof(image_path), "%s%s", sc.buttondir, "help-contents2.png");
+	image = gtk_image_new_from_file(image_path);
+	gtk_button_set_image(GTK_BUTTON(button), image);
+	gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+	gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 5);
+
+	return  hbox;
+}
+
+void screen_nootbook_thread_analyzer_init(GtkWidget *notebook)
 {
 	GtkWidget *label;
 	GtkWidget *left, *right;
 	GtkWidget *paned;
+	GtkWidget *vbox;
+	GtkWidget *hbox;
+
+	vbox = gtk_vbox_new(FALSE, 0);
+	hbox = screen_nootbook_thread_analyzer_control();
 
 	paned = gtk_hpaned_new();
 
@@ -2416,479 +2290,46 @@ static void screen_nootbook_thread_analyzer_init(GtkWidget *notebook)
 	right = screen_nootbook_thread_analyzer_right_new(paned);
 	gtk_paned_pack2(GTK_PANED(paned), right, FALSE, TRUE);
 
+	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(vbox), paned, TRUE, TRUE, 0);
+
 	label = gtk_label_new("Thread Analyzer");
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), paned, label);
-
-}
-
-
-static GtkWidget *screen_notebook_main_init(void)
-{
-	/* Create a new notebook, place the position of the tabs */
-	sc.screen.main_paned_workspace = gtk_notebook_new();
-	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(sc.screen.main_paned_workspace), GTK_POS_BOTTOM);
-
-	screen_nootbook_status_init(sc.screen.main_paned_workspace);
-	screen_nootbook_cbs_init(sc.screen.main_paned_workspace);
-	screen_nootbook_ebs_init(sc.screen.main_paned_workspace);
-	screen_nootbook_thread_analyzer_init(sc.screen.main_paned_workspace);
-
-	gtk_notebook_set_current_page(GTK_NOTEBOOK(sc.screen.main_paned_workspace), 0);
-
-	//gtk_box_pack_start(GTK_BOX(sc.screen.main_paned_workspace), sc.screen.main_paned_workspace, TRUE, TRUE, 0);
-	gtk_widget_set_size_request(sc.screen.main_paned_workspace, 50, -1);
-
-	return sc.screen.main_paned_workspace;
-
-}
-
-enum
-{
-	COLUMN = 0,
-	NUM_COLS
-} ;
-
-static void  on_changed(GtkWidget *widget, gpointer statusbar)
-{
-	GtkTreeIter iter;
-	GtkTreeModel *model;
-	char *value;
-
-
-	(void) statusbar;
-
-
-	if (gtk_tree_selection_get_selected(
-				GTK_TREE_SELECTION(widget), &model, &iter)) {
-
-		gtk_tree_model_get(model, &iter, COLUMN, &value,  -1);
-		fprintf(stderr, "select: %s\n", value);
-		g_free(value);
-	}
-}
-
-
-static GtkTreeModel * create_and_fill_model (void)
-{
-	GtkTreeStore *treestore;
-	GtkTreeIter toplevel, child;
-
-	treestore = gtk_tree_store_new(NUM_COLS,
-			G_TYPE_STRING);
-
-	gtk_tree_store_append(treestore, &toplevel, NULL);
-	gtk_tree_store_set(treestore, &toplevel, COLUMN, "Trace Based Analysis", -1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Lock Contention",
-			-1);
-
-	gtk_tree_store_append(treestore, &toplevel, NULL);
-	gtk_tree_store_set(treestore, &toplevel, COLUMN, "EBS Analysis", -1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Pipeline Stalls",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Frontent Stalls",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Backend Stalls",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "CPU Time",
-			-1);
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "CPI/IPC",
-			-1);
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Cache Behavior",
-			-1);
-
-	gtk_tree_store_append(treestore, &toplevel, NULL);
-	gtk_tree_store_set(treestore, &toplevel, COLUMN, "CBS Analysis", -1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "C",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "C",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "C",
-			-1);
-
-	return GTK_TREE_MODEL(treestore);
-}
-
-
-static GtkWidget *create_view_and_model(void)
-{
-	GtkTreeViewColumn *col;
-	GtkCellRenderer *renderer;
-	GtkWidget *view;
-	GtkTreeModel *model;
-
-	view = gtk_tree_view_new();
-
-	col = gtk_tree_view_column_new();
-	gtk_tree_view_column_set_title(col, "Analysis");
-	gtk_tree_view_append_column(GTK_TREE_VIEW(view), col);
-
-	renderer = gtk_cell_renderer_text_new();
-	gtk_tree_view_column_pack_start(col, renderer, TRUE);
-	gtk_tree_view_column_add_attribute(col, renderer, 
-			"text", COLUMN);
-
-	model = create_and_fill_model();
-	gtk_tree_view_set_model(GTK_TREE_VIEW(view), model);
-	g_object_unref(model);
-
-	return view;
-}
-
-static GtkWidget *screen_mainwindow_control_select_new(void)
-{
-	GtkWidget *scroll_widget;
-	GtkWidget *view;
-	GtkTreeSelection *selection;
-
-	scroll_widget = gtk_scrolled_window_new(NULL, NULL);
-
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll_widget),
-				       GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-	gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scroll_widget),
-					    GTK_SHADOW_OUT);
-
-	view = create_view_and_model();
-	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(view));
-	g_signal_connect(selection, "changed", G_CALLBACK(on_changed), NULL);
-
-
-	//gtk_container_add(GTK_CONTAINER(scroll_widget), view);
-	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scroll_widget), view);
-
-	return scroll_widget;
-}
-
-
-static GtkWidget *screen_mainwindow_control_overview_program_anatomy_new(void)
-{
-	GtkWidget *expander;
-	GtkWidget *entry;
-	GtkWidget *table;
-	GtkTooltips *tooltip;
-
-	expander= gtk_expander_new("Program Anatomy");
-
-
-	table = gtk_table_new(4, 2, TRUE);
-
-	gtk_table_set_row_spacings(GTK_TABLE(table), 2);
-	gtk_table_set_col_spacings(GTK_TABLE(table), 2);
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "Executable Size:");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 0, 1, 0, 1);
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "19491393 byte");
-	tooltip = gtk_tooltips_new();
-	gtk_tooltips_set_tip(tooltip, entry, "Size of the executable in byte", NULL);
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 1, 2, 0, 1);
-
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "Last Modified");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 0, 1, 1, 2);
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "Di 19. Jun 22:38:39 CEST 2012");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 1, 2, 1, 2);
-
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "Owner:Group");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 0, 1, 2, 3);
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "pfeifer:pfeifer");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 1, 2, 2, 3);
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "BuildID");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 0, 1, 3, 4);
-
-	entry = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry), "0x5da35aaed2c163e1d83ae5273d8c9c21967ba49a");
-	gtk_table_attach_defaults(GTK_TABLE(table), entry, 1, 2, 3, 4);
-
-
-	gtk_container_add(GTK_CONTAINER(expander), table);
-	gtk_expander_set_expanded(GTK_EXPANDER(expander), TRUE);
-
-	return expander;
-}
-
-#define	COLORF(x) ((float)x/255)
-
-static gboolean screen_mainwindow_control_overview_thread_behavior_draw(GtkWidget *widget,
-		GdkEventExpose *event, gpointer data)
-{
-	cairo_t *cr;
-	int i;
-
-	(void) event;
-	(void) data;
-
-	/* get a cairo_t */
-	cr = gdk_cairo_create(widget->window);
-
-	gtk_widget_set_size_request(widget, 600, 150);
-
-	cairo_rectangle(cr, 0, 0, 600, 150);
-	cairo_clip (cr);
-
-	cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
-
-	cairo_set_line_width(cr, 1);
-
-	cairo_set_source_rgb(cr, 0.25, 0.25, 0.25);
-	cairo_rectangle(cr, 5, 5, 600 - 10, 140);
-	cairo_fill(cr);
-	cairo_set_source_rgb(cr, 0.15, 0.15, 0.15);
-	cairo_rectangle(cr, 5, 5, 600 - 10, 140);
-	cairo_stroke(cr);
-
-
-	/* draw grid */
-	cairo_set_source_rgb(cr, 0.15, 0.15, 0.15);
-	cairo_set_line_width(cr, 1);
-	for (i = 5; i < 600; i += 50) {
-		cairo_move_to(cr, i, 5);
-		cairo_line_to(cr, i, 145);
-		cairo_stroke(cr);
-	}
-
-
-
-	cairo_set_source_rgb(cr, COLORF(102), COLORF(153), COLORF(204));
-
-	cairo_rectangle(cr, 40, 30, 540, 10);
-	cairo_fill(cr);
-
-	cairo_rectangle(cr, 50, 50, 240, 10);
-	cairo_fill(cr);
-
-	cairo_rectangle(cr, 30, 70, 40, 10);
-	cairo_fill(cr);
-
-	cairo_rectangle(cr, 10, 90, 100, 10);
-	cairo_fill(cr);
-
-	cairo_rectangle(cr, 80, 110, 440, 10);
-	cairo_fill(cr);
-
-	cairo_rectangle(cr, 20, 130, 500, 10);
-	cairo_fill(cr);
-
-	cairo_destroy (cr);
-
-	//fprintf(stderr, "- %d - %d\n", g->width , g->height);
-
-	return TRUE;
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), vbox, label);
 }
 
 
 
-static GtkWidget *screen_mainwindow_control_overview_thread_behavior_new(void)
+
+
+static void control_window_reload_new_project(struct studio_context *xsc, gchar *path)
 {
-	GtkWidget *expander;
-	GtkWidget *darea;
+	assert(sc.screen.project_overview);
+	assert(sc.screen.control_pane);
 
-	expander= gtk_expander_new("Thread Runtime");
+	/* first, we destroy the old widget */
+	gtk_widget_destroy(sc.screen.project_overview);
 
-	darea = gtk_drawing_area_new();
-
-	g_signal_connect(darea, "expose-event", G_CALLBACK(screen_mainwindow_control_overview_thread_behavior_draw), NULL);
-
-	gtk_container_add(GTK_CONTAINER(expander), darea);
-	gtk_expander_set_expanded(GTK_EXPANDER (expander), FALSE);
-
-	return expander;
+	sc.screen.project_overview = screen_mainwindow_control_overview_new(xsc, path);
+	gtk_paned_pack2(GTK_PANED(sc.screen.control_pane), sc.screen.project_overview, FALSE, FALSE);
+	gtk_widget_show_all(sc.screen.control_pane);
 }
 
-
-static GtkWidget *screen_mainwindow_control_overview_wait_and_block_new(void)
-{
-	GtkWidget *expander;
-	GtkWidget *entry;
-
-	expander= gtk_expander_new("Wait and Blocking Behavior");
-
-	entry = gtk_entry_new();
-	gtk_container_add(GTK_CONTAINER(expander), entry);
-	gtk_expander_set_expanded(GTK_EXPANDER (expander), FALSE);
-
-	return expander;
-}
-
-
-static GtkWidget *screen_mainwindow_control_overview_segment_sizes_new(void)
-{
-	GtkWidget *expander;
-	GtkWidget *entry;
-
-	expander= gtk_expander_new("Segment Sized");
-
-	entry = gtk_entry_new();
-	gtk_container_add(GTK_CONTAINER(expander), entry);
-	gtk_expander_set_expanded(GTK_EXPANDER (expander), FALSE);
-
-	return expander;
-}
-
-
-static GtkWidget *screen_mainwindow_control_overview_ks_us_times_new(void)
-{
-	GtkWidget *expander;
-	GtkWidget *entry;
-
-	expander= gtk_expander_new("Kernel Userspace Ratio");
-
-	entry = gtk_entry_new();
-	gtk_container_add(GTK_CONTAINER(expander), entry);
-	gtk_expander_set_expanded(GTK_EXPANDER (expander), FALSE);
-
-	return expander;
-}
-
-
-static GtkWidget *screen_mainwindow_control_overview_function_sizes_new(void)
-{
-	GtkWidget *expander;
-	GtkWidget *entry;
-
-	expander= gtk_expander_new("Functions Sized");
-
-	entry = gtk_entry_new();
-	gtk_container_add(GTK_CONTAINER(expander), entry);
-	gtk_expander_set_expanded(GTK_EXPANDER (expander), FALSE);
-
-	return expander;
-}
-
-static GtkWidget *screen_mainwindow_control_overview_systemcall_distribution_new(void)
-{
-	GtkWidget *expander;
-	GtkWidget *entry;
-
-	expander= gtk_expander_new("Systemcall Distribution");
-
-	entry = gtk_entry_new();
-	gtk_container_add(GTK_CONTAINER(expander), entry);
-	gtk_expander_set_expanded(GTK_EXPANDER (expander), FALSE);
-
-	return expander;
-}
-
-
-static GtkWidget *screen_mainwindow_control_overview_new(void)
-{
-	GtkWidget *vbox;
-	GtkWidget *widget;
-	GtkWidget *scroll_widget;
-	GtkWidget *main_frame;
-	//GtkWidget *info_bar;
-	//GtkWidget *message_label;
-	//GtkWidget *content_area;
-
-	scroll_widget = gtk_scrolled_window_new(NULL, NULL);
-
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll_widget),
-				       GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-	gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scroll_widget),
-					    GTK_SHADOW_OUT);
-
-	main_frame = gtk_frame_new("Project Overview");
-
-	vbox = gtk_vbox_new(FALSE, 10);
-
-	//info_bar = gtk_info_bar_new ();
-	//gtk_widget_set_no_show_all (info_bar, TRUE);
-	//message_label = gtk_label_new ("Executable newer then perf data - please restart");
-	//gtk_widget_show (message_label);
-	//content_area = gtk_info_bar_get_content_area (GTK_INFO_BAR (info_bar));
-	//gtk_container_add (GTK_CONTAINER (content_area), message_label);
-	//gtk_info_bar_add_button (GTK_INFO_BAR (info_bar),  GTK_STOCK_OK, GTK_RESPONSE_OK);
-	//g_signal_connect (info_bar, "response", G_CALLBACK (gtk_widget_hide), NULL);
-	//gtk_widget_show (info_bar);
-	//gtk_box_pack_start(GTK_BOX(vbox), info_bar, TRUE, FALSE, 0);
-
-
-
-	widget = screen_mainwindow_control_overview_program_anatomy_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	widget = screen_mainwindow_control_overview_thread_behavior_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	widget = screen_mainwindow_control_overview_wait_and_block_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	widget = screen_mainwindow_control_overview_ks_us_times_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	widget = screen_mainwindow_control_overview_segment_sizes_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	widget = screen_mainwindow_control_overview_function_sizes_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	widget = screen_mainwindow_control_overview_systemcall_distribution_new();
-	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
-
-	gtk_container_add(GTK_CONTAINER(main_frame), vbox);
-
-	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scroll_widget), main_frame);
-
-
-	return scroll_widget;
-}
 
 
 static GtkWidget *screen_mainwindow_control_new(void)
 {
-	GtkWidget *left_selection, *right_overview;
-	GtkWidget *paned;
+	GtkWidget *left_selection;
 
-	paned = gtk_hpaned_new();
+	sc.screen.control_pane = gtk_hpaned_new();
 
-	left_selection = screen_mainwindow_control_select_new();
-	gtk_paned_pack1(GTK_PANED(paned), left_selection, FALSE, FALSE);
+	left_selection = control_pane_new(&sc);
+	gtk_paned_pack1(GTK_PANED(sc.screen.control_pane), left_selection, FALSE, FALSE);
 
-	right_overview = screen_mainwindow_control_overview_new();
-	gtk_paned_pack2(GTK_PANED(paned), right_overview, FALSE, FALSE);
+	sc.screen.project_overview = screen_mainwindow_control_overview_new(&sc, NULL);
+	gtk_paned_pack2(GTK_PANED(sc.screen.control_pane), sc.screen.project_overview, FALSE, FALSE);
 
 
-	return paned;
+	return sc.screen.control_pane;
 }
 
 
@@ -2901,9 +2342,8 @@ static void screen_toolbar_mainwindow_init(void)
 	gtk_paned_pack1(GTK_PANED(sc.screen.main_paned), sc.screen.main_paned_control, TRUE, FALSE);
 
 	/* down side workspace (notebook) panel */
-	sc.screen.main_paned_workspace = screen_notebook_main_init();
+	sc.screen.main_paned_workspace = screen_notebook_main_init(&sc);
 	gtk_paned_pack2(GTK_PANED(sc.screen.main_paned), sc.screen.main_paned_workspace, TRUE, TRUE);
-
 
 	gtk_box_pack_start(GTK_BOX(sc.screen.vbox), sc.screen.main_paned, TRUE, TRUE, 0);
 	gtk_widget_show_all(sc.screen.main_paned);
@@ -2912,38 +2352,8 @@ static void screen_toolbar_mainwindow_init(void)
 
 static void screen_new_project_journey_cb(struct studio_assitant_new_project_data *pd)
 {
-	bool ret;
-	gchar *dirname;
-	gchar conf_path[PATH_MAX];
-	gchar perf_data_path[PATH_MAX];
-
 	assert(pd);
-
-	fprintf(stderr, "project data\n");
-	fprintf(stderr, "\tproject name:    %s\n", pd->project_name);
-	fprintf(stderr, "\texecutable path: %s\n", pd->executable_path);
-
-	assert(pd->executable_path);
-
-	dirname = g_path_get_dirname(pd->executable_path);
-	assert(dirname);
-
-	g_snprintf(conf_path, PATH_MAX - 1, "%s/%s", dirname, ".perf-studio.xml");
-	g_snprintf(perf_data_path, PATH_MAX - 1, "%s/%s", dirname, ".perf-studio-data");
-
-	if (!g_file_test(perf_data_path, G_FILE_TEST_EXISTS)) {
-		g_print("Creating %s directory\n", perf_data_path);
-		g_mkdir(perf_data_path, 0700);
-	} else {
-		g_print("Directory %s already exists\n", perf_data_path);
-	}
-
-	ret = db_global_generate_project_file(conf_path);
-	if (ret ==  false)
-		goto out;
-
-out:
-	g_free(dirname);
+	db_local_generate_project_file(pd);
 	studio_assitant_new_project_data_free(pd);
 }
 
@@ -3122,29 +2532,36 @@ static void screen_intro_dialog_quick_session(GtkWidget *w)
 	gtk_box_pack_start(GTK_BOX(w), frame, TRUE, TRUE, 0);
 }
 
-
 static void screen_intro_dialog_existing_activated(GtkTreeView *view,
 		GtkTreePath *path, GtkTreeViewColumn *col, gpointer user_data)
 {
 	GtkTreeIter iter;
 	GtkTreeModel *model;
+	struct studio_context *xsc;
 
+	assert(user_data);
 	(void) col;
-	(void) user_data;
+
+	xsc = user_data;
 
 	model = gtk_tree_view_get_model(view);
 
 	if (gtk_tree_model_get_iter(model, &iter, path)) {
-		gchar *name;
-		gtk_tree_model_get(model, &iter, 1, &name, -1);
-		g_print("project selected: %s\n", name);
+		gchar *name, *project_path;
+		gtk_tree_model_get(model, &iter, 0, &name, -1);
+		gtk_tree_model_get(model, &iter, 1, &project_path, -1);
+		gtk_widget_destroy(sc.screen.dialog_window);
+		sc.screen.dialog_window = NULL;
+		g_print("project selected: %s, path: %s\n", name, project_path);
+		control_window_reload_new_project(xsc, project_path);
 		g_free(name);
+		g_free(project_path);
 	}
 }
 
 
 
-static void screen_intro_dialog_existing_project(GtkWidget *w)
+static void screen_intro_dialog_existing_project(struct studio_context *xsc, GtkWidget *w)
 {
 	GtkWidget *frame;
 	GtkListStore *lista1;
@@ -3155,7 +2572,13 @@ static void screen_intro_dialog_existing_project(GtkWidget *w)
 	GSList *gslist;
 	struct db_projects_summary *ps;
 
+	assert(xsc);
+
 	db_generic_get_projects_summaries(&ps);
+	if (!ps) {
+		/* no database entry available */
+		return;
+	}
 
 
 	lista1 = gtk_list_store_new(3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
@@ -3165,27 +2588,34 @@ static void screen_intro_dialog_existing_project(GtkWidget *w)
 	g_signal_connect(tree1,
 			 "row-activated",
 			 G_CALLBACK(screen_intro_dialog_existing_activated),
-			 NULL);
+			 xsc);
 
 
 	renderer = gtk_cell_renderer_text_new();
-	column = gtk_tree_view_column_new_with_attributes("Name", renderer, "text",0,NULL);
+	column = gtk_tree_view_column_new_with_attributes("Name", renderer, "text", 0,NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree1), column);
-	column = gtk_tree_view_column_new_with_attributes("Path", renderer, "text",1,NULL);
+	column = gtk_tree_view_column_new_with_attributes("Path", renderer, "text" ,1,NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree1), column);
-	column = gtk_tree_view_column_new_with_attributes("Date", renderer, "text",2,NULL);
+	column = gtk_tree_view_column_new_with_attributes("Last Used", renderer, "text",2,NULL);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree1), column);
 
 	gslist = ps->list;
 	while (gslist != NULL) {
 		struct db_project_summary *pss;
+		gchar *delta;
+
 		pss = gslist->data;
+
+		delta = studio_utils_human_time_diff(pss->last_accessed);
+		assert(delta);
+
 		gtk_list_store_append(lista1, &iter);
 		gtk_list_store_set(lista1, &iter, 0, pss->name,
 						  1, pss->path,
-						  2, pss->last_accessed,
+						  2, delta,
 						  -1);
 
+		g_free(delta);
 		gslist = g_slist_next(gslist);
 	}
 
@@ -3196,8 +2626,8 @@ static void screen_intro_dialog_existing_project(GtkWidget *w)
 	gtk_container_set_border_width(GTK_CONTAINER(frame), INTRO_FRAME_BORDER);
 	gtk_box_pack_start(GTK_BOX(w), frame, TRUE, TRUE, 0);
 
-	if (ps)
-		db_generic_get_projects_summary_free(ps);
+	/* projects not needed anymore */
+	db_generic_get_projects_summary_free(ps);
 }
 
 
@@ -3219,7 +2649,7 @@ static void screen_intro_dialog_quit(GtkWidget *w)
 }
 
 
-static void screen_intro_dialog_init(void)
+static void screen_intro_dialog_init(struct studio_context *xsc)
 {
 	GtkWidget *vbox;
 	sc.screen.dialog_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -3231,12 +2661,11 @@ static void screen_intro_dialog_init(void)
 	gtk_container_set_border_width(GTK_CONTAINER(sc.screen.dialog_window), 0);
 	gtk_window_set_modal((GtkWindow *)sc.screen.dialog_window, TRUE);
 
-
 	vbox = gtk_vbox_new(FALSE, 0);
 
 	screen_intro_dialog_new_project(vbox);
 	screen_intro_dialog_quick_session(vbox);
-	screen_intro_dialog_existing_project(vbox);
+	screen_intro_dialog_existing_project(xsc, vbox);
 	screen_intro_dialog_quit(vbox);
 
 	gtk_widget_show(vbox);
@@ -3425,6 +2854,12 @@ static void screen_load_theme(void)
 #endif
 }
 
+static void modules_register(struct studio_context *xsc)
+{
+	module_overview_init(xsc);
+	module_example_init(xsc);
+}
+
 
 static int gmain(int ac, const char **av)
 {
@@ -3445,6 +2880,9 @@ static int gmain(int ac, const char **av)
 
 	pr_debug("starting perf studio - 2012\n");
 
+	/* register all modules */
+	modules_register(&sc);
+
 	studio_launch();
 	init_sighandler();
 
@@ -3458,7 +2896,8 @@ static int gmain(int ac, const char **av)
 	/* setup main widget screen */
 	screen_modern_logo();
 	screen_menu_init();
-	screen_toolbar_init();
+	studio_main_status_widget_new(&sc, sc.screen.vbox);
+	//screen_toolbar_init();
 	screen_toolbar_mainwindow_init();
 	screen_statusbar_init();
 
@@ -3469,7 +2908,7 @@ static int gmain(int ac, const char **av)
 	gtk_widget_show(sc.screen.vbox);
 	gtk_widget_show(sc.screen.main_window);
 
-	screen_intro_dialog_init();
+	screen_intro_dialog_init(&sc);
 
 	screen_load_theme();
 

@@ -159,6 +159,7 @@ static GtkWidget *assis_executable(GtkWidget *assistant)
 int assistant_new(void (*cb)(struct studio_assitant_new_project_data *), char *project_name)
 {
 	GtkWidget *assistant, *entry, *label, *progress, *hbox;
+	//GdkPixbuf *pixbuf;
 	struct studio_assitant_new_project_data *pd;
 	guint i;
 
@@ -176,6 +177,11 @@ int assistant_new(void (*cb)(struct studio_assitant_new_project_data *), char *p
 	pd = studio_assitant_new_project_data_alloc();
 	pd->project_name = project_name;
 	pd->cb = cb;
+
+
+	//pixbuf = load_pixbuf_from_file("asm-assistant.png");
+
+
 
 	g_object_set_data(G_OBJECT(assistant), "project-data", (gpointer) pd);
 
@@ -209,6 +215,7 @@ int assistant_new(void (*cb)(struct studio_assitant_new_project_data *), char *p
 	for (i = 0; i < ARRAY_SIZE(page); i++)
 	{
 		page[i].index = gtk_assistant_append_page (GTK_ASSISTANT (assistant), page[i].widget);
+		//gtk_assistant_set_page_side_image(assistant,  page[i].widget,  pixbuf);
 		gtk_assistant_set_page_title (GTK_ASSISTANT (assistant), page[i].widget, page[i].title);
 		gtk_assistant_set_page_type (GTK_ASSISTANT (assistant), page[i].widget, page[i].type);
 
@@ -222,7 +229,7 @@ int assistant_new(void (*cb)(struct studio_assitant_new_project_data *), char *p
 	 * is completely filled. */
 	g_signal_connect (G_OBJECT (entry), "changed", G_CALLBACK (entry_changed), (gpointer) assistant);
 	g_signal_connect (G_OBJECT (page[3].widget), "toggled", G_CALLBACK (button_toggled), (gpointer) assistant);
-	g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (assistant_signal_cb), pd);
+	g_signal_connect (G_OBJECT (assistant), "cancel", G_CALLBACK (assistant_cancel), pd);
 	g_signal_connect (G_OBJECT (assistant), "close", G_CALLBACK (assistant_signal_cb), pd);
 
 	gtk_widget_show_all(assistant);

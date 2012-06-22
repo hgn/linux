@@ -531,6 +531,15 @@ else
 		LIB_OBJS += $(OUTPUT)builtin-studio.o
 		LIB_OBJS += $(OUTPUT)studio-db.o
 		LIB_OBJS += $(OUTPUT)studio-assistant.o
+		LIB_OBJS += $(OUTPUT)studio-utils.o
+		LIB_OBJS += $(OUTPUT)studio-status-widget.o
+		LIB_OBJS += $(OUTPUT)studio-module.o
+		LIB_OBJS += $(OUTPUT)studio-module-example.o
+		LIB_OBJS += $(OUTPUT)studio-module-overview.o
+		LIB_OBJS += $(OUTPUT)studio-control-pane.o
+		LIB_OBJS += $(OUTPUT)studio-main-notebook.o
+		LIB_OBJS += $(OUTPUT)studio-control-overview.o
+		LIB_OBJS += $(OUTPUT)studio-run.o
 		# Make sure that it'd be included only once.
 		ifneq ($(findstring -DNO_NEWT_SUPPORT,$(BASIC_CFLAGS)),)
 			LIB_OBJS += $(OUTPUT)ui/setup.o
@@ -947,7 +956,9 @@ install: all
 	$(INSTALL) share/pixmaps/light/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/light'
 	$(INSTALL) share/pixmaps/dark/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/dark'
 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/24x24'
+	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/16x16'
 	$(INSTALL) share/pixmaps/buttons/24x24/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/24x24'
+	$(INSTALL) share/pixmaps/buttons/16x16/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/16x16'
 
 install-python_ext:
 	$(PYTHON_WORD) util/setup.py --quiet install --root='/$(DESTDIR_SQ)'

@@ -31,20 +31,22 @@
 #include <math.h>
 #include <time.h>
 
-
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+
+#include <glib.h>
+#include <glib/gstdio.h>
 
 #include "perf.h"
 #include "builtin.h"
 
-#include "builtin-studio.h"
+#include "studio-assistant.h"
 #include "studio-db.h"
 
 #define DB_GLOBAL_PATH ".perf-studio-conf.xml"
 
-#define DB_DEFAULT_BACKLOG_MAX_SIZE 536870912  /* 2^29 byte -> 2^30/2 byte) */
-#define DB_DEFAULT_BACKLOG_MAX_NUMBER 10
+#define DB_DEFAULT_BACKLOG_MAX_SIZE "536870912"  /* 2^29 byte -> 2^30/2 byte) */
+#define DB_DEFAULT_BACKLOG_MAX_NUMBER "10"
 
 
 extern struct studio_context sc;
@@ -82,12 +84,78 @@ static gboolean db_project_new(void)
 }
 #endif
 
+gboolean db_global_remove_project_path(const char *path)
+{
+	xmlNodePtr no;
+	xmlNodePtr cell, next;
+
+	for (no = cell->children; no;) {
+		next = no->next;
+		xmlUnlinkNode(no);
+		no=next;
+	}
+}
+
+static bool db_local_get_name(struct studio_assitant_new_project_data *pd)
+{
+}
+
+static bool db_local_get_summary(const char *project_file_path, struct db_project_summary *ps)
+{
+	xmlDocPtr doc;
+	xmlNodePtr level1, level2, level3;
+	xmlChar *value;
+
+	doc = xmlParseFile(project_file_path);
+	if (!doc) {
+		pr_err("Cannot open project file: %s\n", project_file_path);
+		return false;
+	}
+
+	ps->name = g_strdup((gchar *)project_file_path);
+	ps->path = g_strdup((gchar *)project_file_path);
+
+	if (!doc->children) {
+		pr_err("Configuration files is corrupted\n");
+		xmlFreeDoc(doc);
+		return false;
+	}
+
+
+	/* skip root level */
+	level1 = doc->children;
+
+	for (level2 = level1->children;
+	     level2 != NULL;
+	     level2 = level2->next) {
+
+
+		if (xmlStrEqual(level2->name, BAD_CAST "last-accessed")) {
+			value = xmlNodeGetContent(level2);
+			ps->last_accessed = g_strdup((gchar *)value);
+			xmlFree(value);
+		}
+
+		if (xmlStrEqual(level2->name, BAD_CAST "name")) {
+			value = xmlNodeGetContent(level2);
+			ps->name = g_strdup((gchar *)value);
+			xmlFree(value);
+		}
+	}
+
+	xmlFreeDoc(doc);
+
+	return true;
+}
+
+
 
 /* Return false if something went wrong
  * or when no project is in the database
  */
 gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps)
 {
+	bool ret;
 	xmlDocPtr doc;
 	xmlNodePtr nodeLevel1;
 	xmlNodePtr nodeLevel2;
@@ -95,16 +163,14 @@ gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps)
 	xmlNodePtr nodeLevel4;
 	struct db_projects_summary *ps;
 	struct db_project_summary *pss;
-	xmlChar *c1, *c2, *c3;
+	xmlChar *project_path;
 
 	ps = NULL;
 	*xps = NULL;
 
-	c1 = c2 = c3 = NULL;
-
+	ret = true;
 
 	doc = db_generic_open_global_conf();
-
 	if (!doc) {
 		pr_err("Could not open global configuration file\n");
 		return false;
@@ -112,6 +178,7 @@ gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps)
 
 	if (!doc->children) {
 		pr_err("Configuration files is corrupted\n");
+		db_generic_close_global_conf(doc);
 		return false;
 	}
 
@@ -119,13 +186,9 @@ gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps)
 	/* skip root level */
 	nodeLevel1 = doc->children;
 
-
-
 	for (nodeLevel2 = nodeLevel1->children;
 	     nodeLevel2 != NULL;
 	     nodeLevel2 = nodeLevel2->next) {
-
-		fprintf(stderr, "X\n");
 
 
 		if (!xmlStrEqual(nodeLevel2->name, BAD_CAST "projects"))
@@ -136,6 +199,7 @@ gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps)
 		     nodeLevel3 = nodeLevel3->next) {
 
 
+
 			if (!xmlStrEqual(nodeLevel3->name, BAD_CAST "project"))
 				continue;
 
@@ -144,56 +208,38 @@ gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps)
 			     nodeLevel4 = nodeLevel4->next) {
 
 
-				if (xmlStrEqual(nodeLevel4->name, BAD_CAST "name")) {
-					c1 = xmlNodeGetContent(nodeLevel4);
-				}
-
 				if (xmlStrEqual(nodeLevel4->name, BAD_CAST "path")) {
-					c2 = xmlNodeGetContent(nodeLevel4);
+					project_path = xmlNodeGetContent(nodeLevel4);
+					pss = g_malloc0(sizeof(*pss));
+					ret = db_local_get_summary(project_path, pss);
+					if (ret != true) {
+						pr_err("Failed to parse local project file (%s)\n",
+								project_path);
+						xmlFree(project_path);
+						if (ps)
+							db_generic_get_projects_summary_free(ps);
+						*xps = NULL;
+						return false;
+					}
+
+					xmlFree(project_path);
+
+					if (!ps) {
+						ps = g_malloc(sizeof(*ps));
+						ps->list = NULL;
+					}
+
+					ps->list = g_slist_append(ps->list, pss);
+
 				}
-
-				if (xmlStrEqual(nodeLevel4->name, BAD_CAST "last-accessed")) {
-					c3 = xmlNodeGetContent(nodeLevel4);
-				}
-			}
-
-			if (c1 && c2 && c3) {
-				if (!ps) {
-					ps = g_malloc(sizeof(*ps));
-					ps->list = NULL;
-				}
-
-				pss = g_malloc(sizeof(*pss));
-				pss->name          = g_strdup((gchar *)c1);
-				pss->path          = g_strdup((gchar *)c2);
-				pss->last_accessed = g_strdup((gchar *)c3);
-
-				ps->list = g_slist_append(ps->list, pss);
-
-				xmlFree(c1); xmlFree(c2); xmlFree(c3);
-				c1 = c2 = c3 = NULL;
-
-				continue;
-			}
-
-			if (c1 || c2 || c3) {
-				pr_err("Database seems corrupt (%s), please fix",
-					       sc.db.global_conf_path);
-				return false;
-
 			}
 		}
 	}
 
-	/* c1, c2, c3 SHOULD be freed */
-	assert(!c1); assert(!c2); assert(!c3);
-
+	*xps = ps;
 	db_generic_close_global_conf(doc);
 
-
-	*xps = ps;
-
-	return true;
+	return ret;
 }
 
 
@@ -223,10 +269,39 @@ void db_generic_get_projects_summary_free(struct db_projects_summary *ps)
 }
 
 
+static xmlNodePtr get_project_root(xmlDocPtr doc)
+{
+	xmlNodePtr nodeLevel1, nodeLevel2;
+
+	assert(doc);
+
+	if (!doc->children)
+		return NULL;
+
+	nodeLevel1 = doc->children;
+
+	for (nodeLevel2 = nodeLevel1->children;
+	     nodeLevel2 != NULL;
+	     nodeLevel2 = nodeLevel2->next) {
+
+		if (!xmlStrEqual(nodeLevel2->name, BAD_CAST "projects"))
+			continue;
+
+		fprintf(stderr, "-> %s\n", nodeLevel2->name);
+
+
+		return nodeLevel2;
+	}
+
+	return NULL;
+}
+
+
+
 static bool db_global_generate_database_templace(const char *path)
 {
 	xmlDocPtr doc;
-	xmlNodePtr root_node, node, node1, node_statistic;
+	xmlNodePtr root_node, node, node1, node_statistic, gui_configuration;
 	char time_str[256];
 	time_t t;
 	struct tm *tmp;
@@ -268,6 +343,10 @@ static bool db_global_generate_database_templace(const char *path)
 	xmlNewChild(node_statistic, NULL, BAD_CAST "trace-backlog-max-byte-history", BAD_CAST DB_DEFAULT_BACKLOG_MAX_SIZE);
 	xmlNewChild(node_statistic, NULL, BAD_CAST "trace-backlog-max-number", BAD_CAST DB_DEFAULT_BACKLOG_MAX_NUMBER);
 
+	/* gui configuration */
+	gui_configuration = xmlNewChild(root_node, NULL, BAD_CAST "gui-configuration", NULL);
+	xmlNewChild(gui_configuration, NULL, BAD_CAST "theme", BAD_CAST "dark");
+
 	/* placeholder */
 	xmlNewChild(node_statistic, NULL, BAD_CAST "last-project-name", NULL);
 
@@ -276,6 +355,166 @@ static bool db_global_generate_database_templace(const char *path)
 
 	return true;
 }
+
+
+/* this adds the path to the global db. If the project
+ * is already in the database it is ignored */
+static bool db_global_add_project_path(char *conf_path, struct studio_assitant_new_project_data *pd)
+{
+	bool ret;
+	xmlDocPtr doc;
+	xmlNodePtr project_doc, project_node;
+
+	assert(sc.db.global_conf_path);
+
+	ret = true;
+	doc = db_generic_open_global_conf();
+	if (!doc) {
+		pr_err("Cannot parse global database: %s\n", sc.db.global_conf_path);
+		return false;
+	}
+
+
+	project_doc = get_project_root(doc);
+	if (!project_doc) {
+		pr_err("Database seems corrupt (%s), please fix\n",
+			sc.db.global_conf_path);
+		xmlFreeDoc(doc);
+		ret = false;
+		goto out;
+	}
+
+	project_node = xmlNewChild(project_doc, NULL, BAD_CAST "project", NULL);
+	xmlNewProp(project_node, BAD_CAST "active", BAD_CAST "yes");
+
+	xmlNewChild(project_node, NULL, BAD_CAST "path", BAD_CAST conf_path);
+
+	xmlSaveFormatFileEnc(sc.db.global_conf_path, doc, "UTF-8", 1);
+
+out:
+	db_generic_close_global_conf(doc);
+
+	return ret;
+}
+
+
+static void add_new_child_time(xmlNodePtr ptr, const char *child_name)
+{
+	char time_str[256];
+	time_t t;
+	struct tm *tmp;
+
+	/* save first time accessed */
+	t = time(NULL);
+	if (t == (time_t) -1) {
+		pr_warning("Cannot determine current time via time(1)\n");
+		t = 0;
+	}
+	tmp = localtime(&t);
+	if (tmp == NULL) {
+		pr_err("localtime: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	if (strftime(time_str, sizeof(time_str), "%s", tmp) == 0) {
+		fprintf(stderr, "strftime returned 0");
+		exit(EXIT_FAILURE);
+	}
+
+
+	xmlNewChild(ptr, NULL, BAD_CAST child_name, BAD_CAST time_str);
+}
+
+#if 0
+traces
+	trace
+		file-path
+		id type=sha1
+		events
+			event 1
+			event 2
+			event ..
+		events
+	trace
+traces
+#endif
+
+void perf_project_free(struct perf_project *pd)
+{
+	assert(pd);
+
+	g_free(pd->executable_path);
+	g_free(pd->working_dir);
+	g_free(pd);
+	pd = NULL;
+}
+
+bool db_local_get_perf_project(struct studio_context *sc,
+		               gchar *project_path, struct perf_project **pd)
+{
+	xmlDocPtr doc;
+	xmlNodePtr level1, level2, level3;
+	xmlChar *value;
+	struct perf_project *xpd;
+
+	assert(sc);
+	assert(project_path);
+
+	if (access(project_path, F_OK)) {
+		pr_err("Database curruption for project path: %s\n", project_path);
+		return false;
+	}
+
+	doc = xmlParseFile(project_path);
+	if (!doc) {
+		pr_err("Cannot open project file: %s\n", project_path);
+		return false;
+	}
+
+	if (!doc->children) {
+		pr_err("Configuration files is corrupted\n");
+		xmlFreeDoc(doc);
+		return false;
+	}
+
+	xpd = g_malloc0(sizeof(*xpd));
+	xpd->sc = sc;
+
+	/* skip root level */
+	level1 = doc->children;
+
+	for (level2 = level1->children;
+	     level2 != NULL;
+	     level2 = level2->next) {
+
+		if (xmlStrEqual(level2->name, BAD_CAST "name")) {
+			value = xmlNodeGetContent(level2);
+			xpd->name = g_strdup((gchar *)value);
+			xmlFree(value);
+		}
+
+		if (xmlStrEqual(level2->name, BAD_CAST "executable-path")) {
+			value = xmlNodeGetContent(level2);
+			xpd->executable_path = g_strdup((gchar *)value);
+			xmlFree(value);
+		}
+
+		if (xmlStrEqual(level2->name, BAD_CAST "working-dir")) {
+			value = xmlNodeGetContent(level2);
+			xpd->working_dir = g_strdup((gchar *)value);
+			xmlFree(value);
+		}
+	}
+
+
+	xmlFreeDoc(doc);
+
+	*pd = xpd;
+	return true;
+}
+
+
+
 
 /*
  * <perf-studio-project>
@@ -307,34 +546,66 @@ static bool db_global_generate_database_templace(const char *path)
  *   </sessions>
  * </perf-studio-project>
  */
-bool db_global_generate_project_file(const char *path)
+void db_local_generate_project_file(struct studio_assitant_new_project_data *pd)
 {
+	bool ret;
 	xmlDocPtr doc;
-	xmlNodePtr root_node, node, node1, node_statistic, last_session_node;
-	char time_str[256];
-	time_t t;
-	struct tm *tmp;
+	xmlNodePtr root_node, node, node1, last_session_node;
+	gchar *dirname;
+	gchar conf_path[PATH_MAX];
+	gchar perf_data_path[PATH_MAX];
 
 	doc = NULL;
 	root_node = node = node1 = NULL;
+
+
+	fprintf(stderr, "project data\n");
+	fprintf(stderr, "\tproject name:    %s\n", pd->project_name);
+	fprintf(stderr, "\texecutable path: %s\n", pd->executable_path);
+
+	assert(pd->executable_path);
+
+	dirname = g_path_get_dirname(pd->executable_path);
+	assert(dirname);
+
+	g_snprintf(conf_path, PATH_MAX - 1, "%s/%s", dirname, ".perf-studio.xml");
+	g_snprintf(perf_data_path, PATH_MAX - 1, "%s/%s", dirname, ".perf-studio-data");
+
+	if (!g_file_test(perf_data_path, G_FILE_TEST_EXISTS)) {
+		g_print("Creating %s directory\n", perf_data_path);
+		g_mkdir(perf_data_path, 0700);
+	} else {
+		g_print("Directory %s already exists\n", perf_data_path);
+	}
+
 
 	doc = xmlNewDoc(BAD_CAST "1.0");
 	root_node = xmlNewNode(NULL, BAD_CAST "perf-studio-project");
 	xmlDocSetRootElement(doc, root_node);
 
-	xmlNewChild(root_node, NULL, BAD_CAST "executable-path", BAD_CAST "/fooo");
-	xmlNewChild(root_node, NULL, BAD_CAST "executable-arguments", BAD_CAST "arg1 arg2 arg3");
-	xmlNewChild(root_node, NULL, BAD_CAST "working-dir", BAD_CAST "/fooo");
+	xmlNewChild(root_node, NULL, BAD_CAST "executable-path", BAD_CAST pd->executable_path);
+	xmlNewChild(root_node, NULL, BAD_CAST "executable-arguments", BAD_CAST "");
+	xmlNewChild(root_node, NULL, BAD_CAST "working-dir", BAD_CAST dirname);
+	xmlNewChild(root_node, NULL, BAD_CAST "name", BAD_CAST pd->project_name);
 
-	last_session_node = xmlNewChild(root_node, NULL, BAD_CAST "last-lession", NULL);
-	xmlNewProp(last_session_node, BAD_CAST "id", BAD_CAST "00c6d13a68eb4b8112dc423e95ab8cae");
+	add_new_child_time(root_node, "last-accessed");
+
 
 	xmlNewChild(root_node, NULL, BAD_CAST "sessions", NULL);
 
-	xmlSaveFormatFileEnc(path, doc, "UTF-8", 1);
+	ret = db_global_add_project_path(conf_path, pd);
+	if (ret != true) {
+		pr_err("Cannot add new project path (%s) to global db (%s)\n",
+		       conf_path, sc.db.global_conf_path);
+		return;
+	}
+
+	xmlSaveFormatFileEnc(conf_path, doc, "UTF-8", 1);
 	xmlFreeDoc(doc);
 
-	return true;
+	g_free(dirname);
+
+	return;
 }
 
 
@@ -349,6 +620,8 @@ int db_global_init(void)
 
 	/* test XML library version */
 	LIBXML_TEST_VERSION;
+
+	xmlKeepBlanksDefault(0);
 
 	assert(sc.homedirpath);
 	assert(DB_GLOBAL_PATH);
