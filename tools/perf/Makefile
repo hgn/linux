@@ -959,6 +959,7 @@ install: all
 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/16x16'
 	$(INSTALL) share/pixmaps/buttons/24x24/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/24x24'
 	$(INSTALL) share/pixmaps/buttons/16x16/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/share/pixmaps/buttons/16x16'
+	$(INSTALL) share/dbus* -t '/etc/dbus-1/system.d/'
 
 install-python_ext:
 	$(PYTHON_WORD) util/setup.py --quiet install --root='/$(DESTDIR_SQ)'
