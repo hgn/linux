@@ -11,6 +11,11 @@
 
 //#include "studio-control-pane.h"
 
+enum {
+	STUDIO_MODE_EXECUTION,
+	STUDIO_MODE_IDLE,
+};
+
 
 struct studio_context {
 	char *homedirpath;
@@ -66,6 +71,7 @@ struct studio_context {
 
 
 	struct perf_project *perf_project_data;
+	int mode;
 
 	/* this is a function pointer
 	 * list where every user can

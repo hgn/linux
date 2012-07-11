@@ -99,9 +99,14 @@ void studio_run_register_common_data_cb(struct studio_context *sc,
 
 gboolean studio_run(gpointer data)
 {
-	struct perf_project *pp = data;
-
+	struct studio_context *sc;
+	struct perf_project *pp;
 	GError *gerror = NULL;
+
+	assert(data);
+	sc = data;
+	pp = sc->perf_project_data;
+
 	int exit_status = 0;
 	gchar *argv[] = { (char *) "./perf",
 		          (char *) "./perf",
@@ -137,18 +142,17 @@ struct event_record {
 	char event[EVENT_NAME_MAX];
 };
 
+
 /* data required to start a "perf record | stat". The path to the
  * executable, the workding directory et cetera are available in
- * sc->project_data. */
+ * sc->perf_project_data. */
 struct rr_record {
 	GList event_record_list;
 	void (*report_cb)(struct studio_context *, void *priv_data);
 	void *priv_data;
-};
 
-enum {
-	STUDIO_MODE_EXECUTION,
-	STUDIO_MODE_IDLE,
+	/* private data */
+	struct studio_context *sc;
 };
 
 #define EXECUTE_MODE_ASYNC 0x1
@@ -162,7 +166,6 @@ enum {
    implement the most */
 static boolean record_report_async(studio_context *sc, struct rr_record *ed)
 {
-        gboolean (*GSourceFunc) (gpointer user_data);
 
 }
 
@@ -173,9 +176,21 @@ struct record_report_exchange {
         struct studio_context *sc;
 };
 
-static bool record_report(struct studio_context *sc, struct rr_record *ed, int flags)
+
+/**
+ * record_report - execute programm
+ *
+ * @rr_record : defines what is to do
+ * @sc : points to the actual project (path and working dir)
+ */
+static bool record_report(struct rr_record *ed)
 {
+	struct studio_context *sc;
         struct record_report_exchange *record_report_exchange;
+
+	assert(ed);
+
+	sc = ed->sc;
 
         if (sc->mode == STUDIO_MODE_EXECUTION) {
                 /* we are still in execution mode
@@ -183,8 +198,6 @@ static bool record_report(struct studio_context *sc, struct rr_record *ed, int f
                  * registered */
                 return false;
         }
-
-        assert(flags == EXECUTE_MODE_ASYNC);
 
         record_report_exchange = g_malloc0(sizeof(*record_report_exchange));
         record_report_exchange->sc = sc;

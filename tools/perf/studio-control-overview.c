@@ -321,8 +321,7 @@ static GtkWidget *screen_mainwindow_control_overview_systemcall_distribution_new
 }
 
 
-static GtkWidget *screen_mainwindow_control_overview_rerun(struct studio_context *sc,
-		struct perf_project *pd)
+static GtkWidget *screen_mainwindow_control_overview_rerun(struct studio_context *sc)
 {
 	GtkWidget *hbox;
 	GtkWidget *button;
@@ -340,7 +339,7 @@ static GtkWidget *screen_mainwindow_control_overview_rerun(struct studio_context
 	gtk_button_set_label(GTK_BUTTON(button), "  Update ");
 	gtk_widget_set_name(button, "myapp-special-widget");
 
-	g_signal_connect_swapped(G_OBJECT(button), "clicked", G_CALLBACK(studio_run), pd);
+	g_signal_connect_swapped(G_OBJECT(button), "clicked", G_CALLBACK(studio_run), sc);
 
 	gtk_box_pack_end(GTK_BOX(hbox), button, FALSE, FALSE, 5);
 
@@ -355,15 +354,12 @@ static GtkWidget *control_overview_path_new(struct studio_context *sc, gchar *pa
 	GtkWidget *widget;
 	GtkWidget *scroll_widget;
 	GtkWidget *main_frame;
-	struct perf_project *pd;
 
-	ret = db_local_get_perf_project(sc, path, &pd);
+	ret = db_local_get_perf_project(sc, path);
 	if (!ret) {
 		pr_err("Cannot get project data from %s\n", path);
 		return control_overview_empty_new(sc, "Project File Corrupt");
 	}
-
-	sc->perf_project_data = pd;
 
 
 	scroll_widget = gtk_scrolled_window_new(NULL, NULL);
@@ -378,7 +374,7 @@ static GtkWidget *control_overview_path_new(struct studio_context *sc, gchar *pa
 
 	vbox = gtk_vbox_new(FALSE, 10);
 
-	widget = screen_mainwindow_control_overview_rerun(sc, pd);
+	widget = screen_mainwindow_control_overview_rerun(sc);
 	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
 
 	widget = screen_mainwindow_control_overview_program_anatomy_new(sc, pd);

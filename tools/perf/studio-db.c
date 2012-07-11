@@ -449,8 +449,8 @@ void perf_project_free(struct perf_project *pd)
 	pd = NULL;
 }
 
-bool db_local_get_perf_project(struct studio_context *sc,
-		               gchar *project_path, struct perf_project **pd)
+
+bool db_local_get_perf_project(struct studio_context *sc, gchar *project_path)
 {
 	xmlDocPtr doc;
 	xmlNodePtr level1, level2, level3;
@@ -509,7 +509,8 @@ bool db_local_get_perf_project(struct studio_context *sc,
 
 	xmlFreeDoc(doc);
 
-	*pd = xpd;
+	sc->perf_project_data = xpd;
+
 	return true;
 }
 
