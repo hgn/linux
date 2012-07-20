@@ -431,9 +431,31 @@ static void generate_fake_execution_time_history_data(struct mod_overview_priv *
 	od->execution_time_history_list = g_list_append(od->execution_time_history_list, hd);
 
 	hd = g_malloc0(sizeof(*hd));
-	hd->record_time = 50;
+	hd->record_time = 300;
 	hd->value = 38192494;
 	od->execution_time_history_list = g_list_append(od->execution_time_history_list, hd);
+
+	hd = g_malloc0(sizeof(*hd));
+	hd->record_time = 440;
+	hd->value = 98192494;
+	od->execution_time_history_list = g_list_append(od->execution_time_history_list, hd);
+
+
+	hd = g_malloc0(sizeof(*hd));
+	hd->record_time = 500;
+	hd->value = 90192494;
+	od->execution_time_history_list = g_list_append(od->execution_time_history_list, hd);
+
+	hd = g_malloc0(sizeof(*hd));
+	hd->record_time = 550;
+	hd->value = 58192494;
+	od->execution_time_history_list = g_list_append(od->execution_time_history_list, hd);
+
+	hd = g_malloc0(sizeof(*hd));
+	hd->record_time = 120;
+	hd->value = 98192494;
+	od->execution_time_history_list = g_list_append(od->execution_time_history_list, hd);
+
 }
 
 

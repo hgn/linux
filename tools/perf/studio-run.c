@@ -157,6 +157,8 @@ struct rr_record {
 
 #define EXECUTE_MODE_ASYNC 0x1
 
+#if 0
+
 
 /* this function is called asynchronously. We spawn performance
    subsystem and exectute the programm. Ater that we call the registered
@@ -223,3 +225,5 @@ void record_report_cb(struct studio_context *sc, struct rr_record_data *rp)
 {
 
 }
+
+#endif

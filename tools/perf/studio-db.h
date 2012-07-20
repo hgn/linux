@@ -42,7 +42,7 @@ gboolean db_generic_get_projects_summaries(struct db_projects_summary **xps);
 void db_generic_get_projects_summary_free(struct db_projects_summary *ps);
 const char *db_get_last_project_path(void);
 void db_local_generate_project_file(struct studio_assitant_new_project_data *pd);
-bool db_local_get_perf_project(struct studio_context *sc, gchar *project_path, struct perf_project **pd);
+bool db_local_get_perf_project(struct studio_context *sc, gchar *project_path);
 void perf_project_free(struct perf_project *);
 
 

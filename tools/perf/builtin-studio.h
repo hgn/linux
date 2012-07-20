@@ -149,9 +149,6 @@ struct control_pane_data {
 	struct studio_context *sc;
 };
 
-/* studio-utils.c */
-GdkPixbuf *load_pixbuf_from_file(const char *);
-
 /* studio-main-notebook.c */
 GtkWidget *screen_notebook_main_init(struct studio_context *);
 bool main_notebook_add_widget(struct studio_context *sc, struct control_pane_data *, GtkWidget *widget);

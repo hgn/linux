@@ -805,7 +805,7 @@ static void draw_curves(GtkWidget *widget, cairo_t *cr)
 				x += chunk_boundary_step;
 			}
 
-			cairo_set_antialias(cr, CAIRO_ANTIALIAS_FAST);
+			cairo_set_antialias(cr, CAIRO_ANTIALIAS_DEFAULT);
 			cairo_line_to(cr, chunk_boundary_end, y - 0 * factor);
 			cairo_close_path(cr);
 			cairo_fill_preserve(cr);
@@ -1481,7 +1481,7 @@ static void screen_menu_init(void)
 	file_sep  = gtk_separator_menu_item_new();
 	file_quit = gtk_image_menu_item_new_from_stock(GTK_STOCK_QUIT, sc.screen.accel_group);
 
-	gtk_widget_add_accelerator(file_quit, "activate", sc.screen.accel_group, GDK_KEY_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator(file_quit, "activate", sc.screen.accel_group, GDK_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 
 	gtk_menu_item_set_submenu(GTK_MENU_ITEM(file), filemenu);
 	gtk_menu_shell_append(GTK_MENU_SHELL(filemenu), file_new);

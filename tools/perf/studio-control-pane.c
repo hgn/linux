@@ -80,12 +80,13 @@ bool control_pane_register_module(struct studio_context *sc, struct module_spec 
 }
 
 
-enum
-{
-	COLUMN = 0,
+enum {
+	NAME = 0,
+	ACTIVE,
+	UPTODATE,
+	SUGGESTED,
 	NUM_COLS
-} ;
-
+};
 
 
 
@@ -105,7 +106,7 @@ void row_activated(GtkTreeView *treeview, GtkTreePath *path,
 
 	if (gtk_tree_model_get_iter(model, &iter, path)) {
 		gchar *name;
-		gtk_tree_model_get(model, &iter, COLUMN, &name, -1);
+		gtk_tree_model_get(model, &iter, NAME, &name, -1);
 
 		fprintf(stderr, "row actived: %s\n", name);
 
@@ -140,64 +141,64 @@ static GtkTreeModel *create_and_fill_model(struct studio_context *sc)
 	GtkTreeStore *treestore;
 	GtkTreeIter toplevel, child;
 
-	treestore = gtk_tree_store_new(NUM_COLS,
-			G_TYPE_STRING);
+	treestore = gtk_tree_store_new(NUM_COLS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
 	gtk_tree_store_append(treestore, &toplevel, NULL);
-	gtk_tree_store_set(treestore, &toplevel, COLUMN, "Trace Based Analysis", -1);
+
+	gtk_tree_store_set(treestore, &toplevel, NAME, "Trace Based Analysis", -1);
 
 	gtk_tree_store_append(treestore, &child, &toplevel);
 	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Lock Contention",
-			-1);
-
-	gtk_tree_store_append(treestore, &toplevel, NULL);
-	gtk_tree_store_set(treestore, &toplevel, COLUMN, "EBS Analysis", -1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Pipeline Stalls",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Frontent Stalls",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Backend Stalls",
-			-1);
-
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "CPU Time",
-			-1);
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "CPI/IPC",
-			-1);
-	gtk_tree_store_append(treestore, &child, &toplevel);
-	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Cache Behavior",
+			NAME, "Lock Contention",
 			-1);
 
 	gtk_tree_store_append(treestore, &toplevel, NULL);
-	gtk_tree_store_set(treestore, &toplevel, COLUMN, "Event Analysis", -1);
+	gtk_tree_store_set(treestore, &toplevel, NAME, "EBS Analysis", UPTODATE, "yes", -1);
 
 	gtk_tree_store_append(treestore, &child, &toplevel);
 	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Scheduling Analysis",
+			NAME, "Pipeline Stalls",
 			-1);
 
 	gtk_tree_store_append(treestore, &child, &toplevel);
 	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Priority Analysis",
+			NAME, "Frontent Stalls",
 			-1);
 
 	gtk_tree_store_append(treestore, &child, &toplevel);
 	gtk_tree_store_set(treestore, &child,
-			COLUMN, "Wakeup Analysis",
+			NAME, "Backend Stalls",
+			-1);
+
+	gtk_tree_store_append(treestore, &child, &toplevel);
+	gtk_tree_store_set(treestore, &child,
+			NAME, "CPU Time",
+			-1);
+	gtk_tree_store_append(treestore, &child, &toplevel);
+	gtk_tree_store_set(treestore, &child,
+			NAME, "CPI/IPC",
+			-1);
+	gtk_tree_store_append(treestore, &child, &toplevel);
+	gtk_tree_store_set(treestore, &child,
+			NAME, "Cache Behavior",
+			-1);
+
+	gtk_tree_store_append(treestore, &toplevel, NULL);
+	gtk_tree_store_set(treestore, &toplevel, NAME, "Event Analysis", -1);
+
+	gtk_tree_store_append(treestore, &child, &toplevel);
+	gtk_tree_store_set(treestore, &child,
+			NAME, "Scheduling Analysis",
+			-1);
+
+	gtk_tree_store_append(treestore, &child, &toplevel);
+	gtk_tree_store_set(treestore, &child,
+			NAME, "Priority Analysis",
+			-1);
+
+	gtk_tree_store_append(treestore, &child, &toplevel);
+	gtk_tree_store_set(treestore, &child,
+			NAME, "Wakeup Analysis",
 			-1);
 
 	tmp = sc->control_pane_data_list;
@@ -207,9 +208,7 @@ static GtkTreeModel *create_and_fill_model(struct studio_context *sc)
 		cpml = tmp->data;
 
 		gtk_tree_store_append(treestore, &child, &toplevel);
-		gtk_tree_store_set(treestore, &child,
-				COLUMN, cpml->name,
-				-1);
+		gtk_tree_store_set(treestore, &child, NAME, cpml->name, -1);
 
 		tmp = g_list_next(tmp);
 	}
@@ -230,17 +229,56 @@ static GtkWidget *create_view_and_model(struct studio_context *sc)
 
 	view = gtk_tree_view_new();
 
+	/* column one */
 	col = gtk_tree_view_column_new();
-	gtk_tree_view_column_set_title(col, "Analysis");
+	gtk_tree_view_column_set_title(col, " Analysis ");
+
 	gtk_tree_view_append_column(GTK_TREE_VIEW(view), col);
 
 	renderer = gtk_cell_renderer_text_new();
 	gtk_tree_view_column_pack_start(col, renderer, TRUE);
-	gtk_tree_view_column_add_attribute(col, renderer, "text", COLUMN);
+	gtk_tree_view_column_add_attribute(col, renderer, "text", NAME);
+
+
+	/* column two */
+	col = gtk_tree_view_column_new();
+	gtk_tree_view_column_set_title(col, " Active ");
+
+	gtk_tree_view_append_column(GTK_TREE_VIEW(view), col);
+
+	renderer = gtk_cell_renderer_text_new();
+	gtk_tree_view_column_pack_start(col, renderer, TRUE);
+	gtk_tree_view_column_add_attribute(col, renderer, "text", ACTIVE);
+
+
+	/* column three */
+	col = gtk_tree_view_column_new();
+	gtk_tree_view_column_set_title(col, " UpToDate ");
+
+	gtk_tree_view_append_column(GTK_TREE_VIEW(view), col);
+
+	renderer = gtk_cell_renderer_text_new();
+	gtk_tree_view_column_pack_start(col, renderer, TRUE);
+	gtk_tree_view_column_add_attribute(col, renderer, "text", UPTODATE);
+
+
+	/* column four */
+	col = gtk_tree_view_column_new();
+	gtk_tree_view_column_set_title(col, " Suggested ");
+
+	gtk_tree_view_append_column(GTK_TREE_VIEW(view), col);
+
+	renderer = gtk_cell_renderer_text_new();
+	gtk_tree_view_column_pack_start(col, renderer, TRUE);
+	gtk_tree_view_column_add_attribute(col, renderer, "text", SUGGESTED);
+
+
 
 	model = create_and_fill_model(sc);
 	gtk_tree_view_set_model(GTK_TREE_VIEW(view), model);
 	g_object_unref(model);
+
+	gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(view)), GTK_SELECTION_NONE);
 
 	return view;
 }

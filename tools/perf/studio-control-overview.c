@@ -58,7 +58,7 @@ static GtkWidget *control_overview_empty_new(struct studio_context *sc, gchar *t
 #define SCRATCH_BUF_MAX 128
 
 static GtkWidget *screen_mainwindow_control_overview_program_anatomy_new(
-		struct studio_context *sc, struct perf_project *pd)
+		struct studio_context *sc)
 {
 	GtkWidget *expander;
 	GtkWidget *entry;
@@ -66,6 +66,12 @@ static GtkWidget *screen_mainwindow_control_overview_program_anatomy_new(
 	GtkTooltips *tooltip;
 	struct stat sb;
 	char scratch_buf[SCRATCH_BUF_MAX];
+	struct perf_project *pd;
+
+	assert(sc);
+	assert(sc->perf_project_data);
+
+	pd = sc->perf_project_data;
 
 
 	if (stat(pd->executable_path, &sb) == -1)
@@ -377,7 +383,7 @@ static GtkWidget *control_overview_path_new(struct studio_context *sc, gchar *pa
 	widget = screen_mainwindow_control_overview_rerun(sc);
 	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
 
-	widget = screen_mainwindow_control_overview_program_anatomy_new(sc, pd);
+	widget = screen_mainwindow_control_overview_program_anatomy_new(sc);
 	gtk_box_pack_start(GTK_BOX(vbox), widget, FALSE, FALSE, 0);
 
 	widget = screen_mainwindow_control_overview_thread_behavior_new();
