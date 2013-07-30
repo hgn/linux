@@ -177,6 +177,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define TCPOPT_SACK             5       /* SACK Block */
 #define TCPOPT_TIMESTAMP	8	/* Better RTT estimations/PAWS */
 #define TCPOPT_MD5SIG		19	/* MD5 Signature (RFC2385) */
+#define TCPOPT_UTO		28	/* User Timeout (RFC5482) */
 #define TCPOPT_EXP		254	/* Experimental */
 /* Magic number to be after the option value for sharing TCP
  * experimental options. See draft-ietf-tcpm-experimental-options-00.txt
@@ -192,6 +193,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define TCPOLEN_SACK_PERM      2
 #define TCPOLEN_TIMESTAMP      10
 #define TCPOLEN_MD5SIG         18
+#define TCPOLEN_UTO            4
 #define TCPOLEN_EXP_FASTOPEN_BASE  4
 
 /* But this is what stacks really send out. */
@@ -284,6 +286,10 @@ extern int sysctl_tcp_challenge_ack_limit;
 extern unsigned int sysctl_tcp_notsent_lowat;
 extern int sysctl_tcp_min_tso_segs;
 extern int sysctl_tcp_autocorking;
+extern int sysctl_tcp_uto_enabled;
+extern int sysctl_tcp_uto_adv;
+extern int sysctl_tcp_uto_min;
+extern int sysctl_tcp_uto_max;
 
 extern atomic_long_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;
@@ -996,6 +1002,65 @@ static inline void tcp_update_wl(struct tcp_sock *tp, u32 seq)
 	tp->snd_wl1 = seq;
 }
 
+#define TCP_UTOVAL_MASK 0x7fff
+#define TCP_UTOVAL_BIT_MINUTE 0x8000
+
+static inline bool tcp_utoval_is_minutes(u16 v)
+{
+	return (v & TCP_UTOVAL_BIT_MINUTE) != 0;
+}
+
+static inline u32 tcp_uto_rcv_seconds(u16 utoval)
+{
+	u32 res;
+
+	if (likely(!sysctl_tcp_uto_enabled || !utoval))
+		return 0;
+
+	res = utoval & TCP_UTOVAL_MASK;
+
+	/* granularity bit set? */
+	if (tcp_utoval_is_minutes(utoval))
+		res *= 60U;
+
+	if (sysctl_tcp_uto_min && res < sysctl_tcp_uto_min)
+		res = sysctl_tcp_uto_min;
+
+	if (sysctl_tcp_uto_max && res > sysctl_tcp_uto_max)
+		res = sysctl_tcp_uto_max;
+
+	return res;
+}
+
+static inline u16 tcp_uto_val(u32 val)
+{
+	u16 ret;
+
+	if (val > TCP_UTOVAL_MASK) {
+		ret = val / 60;
+		if (ret > TCP_UTOVAL_MASK)
+			ret = TCP_UTOVAL_MASK;
+		ret |= TCP_UTOVAL_BIT_MINUTE;
+	} else {
+		ret = val;
+	}
+
+	return ret;
+}
+
+static inline void tcp_init_uto_snd(struct tcp_sock *tp)
+{
+	if (!sysctl_tcp_uto_enabled || sysctl_tcp_uto_adv < 1)
+		return;
+
+	/* Note: sysctl_tcp_uto_adv bypass any
+	 * sysctl_tcp_uto_{min,max} checks, these are only for
+	 * setsockopt */
+
+	tp->uto_adv = tcp_uto_val(sysctl_tcp_uto_adv);
+	tp->uto_enable = 1;
+}
+
 /*
  * Calculate(/check) TCP checksum
  */
@@ -1094,6 +1159,7 @@ static inline void tcp_openreq_init(struct request_sock *req,
 	req->ts_recent = rx_opt->saw_tstamp ? rx_opt->rcv_tsval : 0;
 	ireq->tstamp_ok = rx_opt->tstamp_ok;
 	ireq->sack_ok = rx_opt->sack_ok;
+	ireq->uto_rcv = rx_opt->uto_rcv;
 	ireq->snd_wscale = rx_opt->snd_wscale;
 	ireq->wscale_ok = rx_opt->wscale_ok;
 	ireq->acked = 0;

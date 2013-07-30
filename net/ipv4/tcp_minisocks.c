@@ -436,6 +436,11 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct request_sock *req,
 
 		newtp->urg_data = 0;
 
+		printk(KERN_ERR "in minisocket- ireq->uto_rcv: %u\n", ireq->uto_rcv);
+
+		newtp->rx_opt.uto_rcv = ireq->uto_rcv;
+		tcp_init_uto_snd(newtp);
+
 		if (sock_flag(newsk, SOCK_KEEPOPEN))
 			inet_csk_reset_keepalive_timer(newsk,
 						       keepalive_time_when(newtp));

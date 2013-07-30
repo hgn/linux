@@ -2696,6 +2696,23 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		tp->notsent_lowat = val;
 		sk->sk_write_space(sk);
 		break;
+	case TCP_UTO:
+		if (!capable(CAP_NET_ADMIN)) {
+			if (!sysctl_tcp_uto_enabled) {
+				err = -EINVAL;
+				break;
+			}
+			if (val < sysctl_tcp_uto_min ||
+			    val > sysctl_tcp_uto_max) {
+				err = -EFAULT;
+				break;
+			}
+		}
+		tp->uto_adv = tcp_uto_val(val);
+		tp->uto_enable = 1;
+		printk(KERN_ERR "uto: setsockopt set to %u (0x%x)\n",
+				tp->uto_adv, tp->uto_adv);
+		break;
 	default:
 		err = -ENOPROTOOPT;
 		break;

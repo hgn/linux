@@ -1496,6 +1496,8 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 	tmp_opt.user_mss  = tp->rx_opt.user_mss;
 	tcp_parse_options(skb, &tmp_opt, 0, want_cookie ? NULL : &foc);
 
+	printk(KERN_ERR "UTO VAL after tcp_parse: %u\n", tmp_opt.uto_rcv);
+
 	if (want_cookie && !tmp_opt.saw_tstamp)
 		tcp_clear_options(&tmp_opt);
 
@@ -1631,6 +1633,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	struct tcp_md5sig_key *key;
 #endif
 	struct ip_options_rcu *inet_opt;
+	u32 uto_val;
 
 	if (sk_acceptq_is_full(sk))
 		goto exit_overflow;
@@ -1692,6 +1695,16 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		sk_nocaps_add(newsk, NETIF_F_GSO_MASK);
 	}
 #endif
+
+	printk(KERN_ERR "RAW UTO VAL: %d\n", newtp->rx_opt.uto_rcv);
+	uto_val = tcp_uto_rcv_seconds(newtp->rx_opt.uto_rcv);
+	printk(KERN_ERR "UTO VAL: %d\n", uto_val);
+	if (unlikely(uto_val && !newtp->uto_adv)) {
+		inet_csk(newsk)->icsk_user_timeout = uto_val * HZ;
+		printk(KERN_ERR "uto received, set socket timeout to %u jiffies\n",
+				uto_val * HZ);
+		newtp->rx_opt.uto_rcv = 0;
+	}
 
 	if (__inet_inherit_port(sk, newsk) < 0)
 		goto put_and_exit;

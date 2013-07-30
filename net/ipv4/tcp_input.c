@@ -99,6 +99,11 @@ int sysctl_tcp_thin_dupack __read_mostly;
 int sysctl_tcp_moderate_rcvbuf __read_mostly = 1;
 int sysctl_tcp_early_retrans __read_mostly = 3;
 
+int sysctl_tcp_uto_enabled __read_mostly = 0;
+int sysctl_tcp_uto_adv __read_mostly = 0;
+int sysctl_tcp_uto_min __read_mostly = TCP_UTO_MIN;
+int sysctl_tcp_uto_max __read_mostly = TCP_UTO_MAX;
+
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
 #define FLAG_DATA_ACKED		0x04 /* This ACK acknowledged new data.		*/
@@ -3612,6 +3617,20 @@ void tcp_parse_options(const struct sk_buff *skb,
 					foc->len = -1;
 				break;
 
+			case TCPOPT_UTO:
+				if (opsize == TCPOLEN_UTO) {
+					u16 uto = get_unaligned_be16(ptr);
+					/* uto 0 with granularity 1 or 0 is
+					 * reserved for future use */
+					if (likely(uto & TCP_UTOVAL_MASK))
+						opt_rx->uto_rcv = uto;
+					else
+						opt_rx->uto_rcv = 0;
+
+					printk(KERN_ERR "U: %u\n", opt_rx->uto_rcv);
+				}
+				break;
+
 			}
 			ptr += opsize-2;
 			length -= opsize;
@@ -5494,6 +5513,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		if (tcp_is_sack(tp) && sysctl_tcp_fack)
 			tcp_enable_fack(tp);
+
+		tcp_init_uto_snd(tp);
 
 		tcp_mtup_init(sk);
 		tcp_sync_mss(sk, icsk->icsk_pmtu_cookie);

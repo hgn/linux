@@ -1108,6 +1108,7 @@ static struct sock *tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	struct tcp_md5sig_key *key;
 #endif
 	struct flowi6 fl6;
+	u32 uto_val;
 
 	if (skb->protocol == htons(ETH_P_IP)) {
 		/*
@@ -1277,6 +1278,14 @@ static struct sock *tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		goto out;
 	}
 	__inet6_hash(newsk, NULL);
+
+	uto_val = tcp_uto_rcv_seconds(newtp->rx_opt.uto_rcv);
+	if (unlikely(uto_val && !newtp->uto_adv)) {
+		inet_csk(newsk)->icsk_user_timeout = uto_val * HZ;
+		printk(KERN_ERR "uto received, set socket timeout to %u jiffies\n",
+				uto_val * HZ);
+		newtp->rx_opt.uto_rcv = 0;
+	}
 
 	return newsk;
 

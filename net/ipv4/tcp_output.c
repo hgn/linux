@@ -400,6 +400,7 @@ static inline bool tcp_urg_mode(const struct tcp_sock *tp)
 #define OPTION_TS		(1 << 1)
 #define OPTION_MD5		(1 << 2)
 #define OPTION_WSCALE		(1 << 3)
+#define OPTION_UTO		(1 << 5)
 #define OPTION_FAST_OPEN_COOKIE	(1 << 8)
 
 struct tcp_out_options {
@@ -510,6 +511,12 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		}
 		ptr += (foc->len + 3) >> 2;
 	}
+
+	if (unlikely(OPTION_UTO & options)) {
+		*ptr++ = htonl((TCPOPT_UTO << 24) |
+			       (TCPOLEN_UTO << 16 | tp->uto_adv));
+		tp->uto_enable = 0;
+	}
 }
 
 /* Compute TCP options for SYN packets. This is not the final
@@ -571,6 +578,11 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			remaining -= need;
 			tp->syn_fastopen = 1;
 		}
+	}
+
+	if (unlikely(tp->uto_enable)) {
+		opts->options |= OPTION_UTO;
+		remaining -= TCPOLEN_UTO;
 	}
 
 	return MAX_TCP_OPTION_SPACE - remaining;
@@ -677,6 +689,15 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 			      TCPOLEN_SACK_PERBLOCK);
 		size += TCPOLEN_SACK_BASE_ALIGNED +
 			opts->num_sack_blocks * TCPOLEN_SACK_PERBLOCK;
+	}
+
+	/* Transmit of TCP_UTO options is permitted even if no UTO options
+	 * were exchanged during 3whs, see RFC 5482, Section 3.2).
+	 */
+	if (unlikely(tp->uto_enable) &&
+			size <= MAX_TCP_OPTION_SPACE - TCPOLEN_UTO) {
+		opts->options |= OPTION_UTO;
+		size += TCPOLEN_UTO;
 	}
 
 	return size;
@@ -2996,6 +3017,8 @@ int tcp_connect(struct sock *sk)
 
 	/* Reserve space for headers. */
 	skb_reserve(buff, MAX_TCP_HEADER);
+
+	tcp_init_uto_snd(tp);
 
 	tcp_init_nondata_skb(buff, tp->write_seq++, TCPHDR_SYN);
 	tp->retrans_stamp = TCP_SKB_CB(buff)->when = tcp_time_stamp;
