@@ -90,6 +90,7 @@ struct inet_request_sock {
 	kmemcheck_bitfield_end(flags);
 	struct ip_options_rcu	*opt;
 	struct sk_buff		*pktopts;
+	u16			uto_rcv;
 };
 
 static inline struct inet_request_sock *inet_rsk(const struct request_sock *sk)

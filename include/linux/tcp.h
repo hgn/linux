@@ -93,6 +93,7 @@ struct tcp_options_received {
 	u8	num_sacks;	/* Number of SACK blocks		*/
 	u16	user_mss;	/* mss requested by user in ioctl	*/
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
+	u16	uto_rcv;	/* User Timeout value received */
 };
 
 static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
@@ -106,6 +107,9 @@ static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
  *   size = TCPOLEN_SACK_BASE_ALIGNED (4) + n * TCPOLEN_SACK_PERBLOCK (8)
  * only four options will fit in a standard TCP header */
 #define TCP_NUM_SACKS 4
+
+#define TCP_UTO_MIN 1
+#define TCP_UTO_MAX 1800
 
 struct tcp_request_sock_ops;
 
@@ -197,7 +201,8 @@ struct tcp_sock {
 	u8	do_early_retrans:1,/* Enable RFC5827 early-retransmit  */
 		syn_data:1,	/* SYN includes data */
 		syn_fastopen:1,	/* SYN includes Fast Open option */
-		syn_data_acked:1;/* data in SYN is acked by SYN-ACK */
+		syn_data_acked:1,/* data in SYN is acked by SYN-ACK */
+		uto_enable:1;	 /* User Timeout Option enabled */
 	u32	tlp_high_seq;	/* snd_nxt at the time of TLP retransmit. */
 
 /* RTT measurement */
@@ -216,6 +221,11 @@ struct tcp_sock {
 	u32	snd_up;		/* Urgent pointer		*/
 
 	u8	keepalive_probes; /* num of allowed keep alive probes	*/
+
+	u16	uto_adv;
+	u8	uto_changeable:1;
+	u8	uto_changed:1;
+
 /*
  *      Options received (usually on last packet, some only on SYN packets).
  */
