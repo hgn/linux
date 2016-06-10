@@ -561,7 +561,7 @@ reset:
 		 * retransmission.
 		 */
 		tp->rttvar_us = jiffies_to_usecs(TCP_TIMEOUT_FALLBACK);
-		tp->mdev_us = tp->mdev_max_us = tp->rttvar_us;
+		tp->mdev_us = tp->rttvar_us;
 
 		inet_csk(sk)->icsk_rto = TCP_TIMEOUT_FALLBACK;
 	}
