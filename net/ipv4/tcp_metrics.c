@@ -420,8 +420,8 @@ void tcp_update_metrics(struct sock *sk)
 
 		/* Scale deviation to rttvar fixed point */
 		m >>= 1;
-		if (m < tp->mdev_us)
-			m = tp->mdev_us;
+		if (m < tp->rttvar_us)
+			m = tp->rttvar_us;
 
 		var = tcp_metric_get(tm, TCP_METRIC_RTTVAR);
 		if (m >= var)
@@ -561,7 +561,6 @@ reset:
 		 * retransmission.
 		 */
 		tp->rttvar_us = jiffies_to_usecs(TCP_TIMEOUT_FALLBACK);
-		tp->mdev_us = tp->mdev_max_us = tp->rttvar_us;
 
 		inet_csk(sk)->icsk_rto = TCP_TIMEOUT_FALLBACK;
 	}

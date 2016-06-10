@@ -386,7 +386,6 @@ void tcp_init_sock(struct sock *sk)
 	INIT_LIST_HEAD(&tp->tsq_node);
 
 	icsk->icsk_rto = TCP_TIMEOUT_INIT;
-	tp->mdev_us = jiffies_to_usecs(TCP_TIMEOUT_INIT);
 	tp->rtt_min[0].rtt = ~0U;
 
 	/* So many TCP implementations out there (incorrectly) count the
@@ -2703,7 +2702,7 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_pmtu = icsk->icsk_pmtu_cookie;
 	info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
 	info->tcpi_rtt = tp->srtt_us >> 3;
-	info->tcpi_rttvar = tp->mdev_us >> 2;
+	info->tcpi_rttvar = tp->rttvar_us >> 2;
 	info->tcpi_snd_ssthresh = tp->snd_ssthresh;
 	info->tcpi_snd_cwnd = tp->snd_cwnd;
 	info->tcpi_advmss = tp->advmss;

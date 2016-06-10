@@ -622,11 +622,6 @@ static inline void tcp_bound_rto(const struct sock *sk)
 		inet_csk(sk)->icsk_rto = TCP_RTO_MAX;
 }
 
-static inline u32 __tcp_set_rto(const struct tcp_sock *tp)
-{
-	return usecs_to_jiffies((tp->srtt_us >> 3) + tp->rttvar_us);
-}
-
 static inline void __tcp_fast_path_on(struct tcp_sock *tp, u32 snd_wnd)
 {
 	tp->pred_flags = htonl((tp->tcp_header_len << 26) |
@@ -664,6 +659,14 @@ static inline u32 tcp_rto_min(struct sock *sk)
 static inline u32 tcp_rto_min_us(struct sock *sk)
 {
 	return jiffies_to_usecs(tcp_rto_min(sk));
+}
+
+static inline u32 __tcp_set_rto(const struct tcp_sock *tp)
+{
+	const u32 rttvar_floor = max(tp->rttvar_us,
+			tcp_rto_min_us((struct sock *)tp));
+
+	return usecs_to_jiffies((tp->srtt_us >> 3) + rttvar_floor);
 }
 
 static inline bool tcp_ca_dst_locked(const struct dst_entry *dst)

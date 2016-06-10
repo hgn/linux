@@ -680,8 +680,7 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
 /* Called to compute a smoothed rtt estimate. The data fed to this
  * routine either comes from timestamps, or from segments that were
  * known _not_ to have been retransmitted [see Karn/Partridge
- * Proceedings SIGCOMM 87]. The algorithm is from the SIGCOMM 88
- * piece by Van Jacobson.
+ * Proceedings SIGCOMM 87].
  * NOTE: the next three routines used to be one big routine.
  * To save cycles in the RFC 1323 implementation it was better to break
  * it up into three procedures. -- erics
@@ -692,59 +691,19 @@ static void tcp_rtt_estimator(struct sock *sk, long mrtt_us)
 	long m = mrtt_us; /* RTT */
 	u32 srtt = tp->srtt_us;
 
-	/*	The following amusing code comes from Jacobson's
-	 *	article in SIGCOMM '88.  Note that rtt and mdev
-	 *	are scaled versions of rtt and mean deviation.
-	 *	This is designed to be as fast as possible
-	 *	m stands for "measurement".
-	 *
-	 *	On a 1990 paper the rto value is changed to:
-	 *	RTO = rtt + 4 * mdev
-	 *
-	 * Funny. This algorithm seems to be very broken.
-	 * These formulae increase RTO, when it should be decreased, increase
-	 * too slowly, when it should be increased quickly, decrease too quickly
-	 * etc. I guess in BSD RTO takes ONE value, so that it is absolutely
-	 * does not matter how to _calculate_ it. Seems, it was trap
-	 * that VJ failed to avoid. 8)
-	 */
 	if (srtt != 0) {
-		m -= (srtt >> 3);	/* m is now error in rtt est */
-		srtt += m;		/* rtt = 7/8 rtt + 1/8 new */
-		if (m < 0) {
-			m = -m;		/* m is now abs(error) */
-			m -= (tp->mdev_us >> 2);   /* similar update on mdev */
-			/* This is similar to one of Eifel findings.
-			 * Eifel blocks mdev updates when rtt decreases.
-			 * This solution is a bit different: we use finer gain
-			 * for mdev in this case (alpha*beta).
-			 * Like Eifel it also prevents growth of rto,
-			 * but also it limits too fast rto decreases,
-			 * happening in pure Eifel.
-			 */
-			if (m > 0)
-				m >>= 3;
-		} else {
-			m -= (tp->mdev_us >> 2);   /* similar update on mdev */
-		}
-		tp->mdev_us += m;		/* mdev = 3/4 mdev + 1/4 new */
-		if (tp->mdev_us > tp->mdev_max_us) {
-			tp->mdev_max_us = tp->mdev_us;
-			if (tp->mdev_max_us > tp->rttvar_us)
-				tp->rttvar_us = tp->mdev_max_us;
-		}
-		if (after(tp->snd_una, tp->rtt_seq)) {
-			if (tp->mdev_max_us < tp->rttvar_us)
-				tp->rttvar_us -= (tp->rttvar_us - tp->mdev_max_us) >> 2;
+		m -= (srtt >> 3);	 /* m' = m - srtt / 8 = (R' - SRTT) */
+		srtt += m;	/* srtt = srtt + m’ = srtt + m - srtt / 8 */
+		if (m < 0)
+			m = -m;
+		m -= (tp->rttvar_us >> 2); /* m'' = |m'| - rttvar / 4 */
+		tp->rttvar_us += m;
+		if (after(tp->snd_una, tp->rtt_seq))
 			tp->rtt_seq = tp->snd_nxt;
-			tp->mdev_max_us = tcp_rto_min_us(sk);
-		}
 	} else {
 		/* no previous measure. */
-		srtt = m << 3;		/* take the measured time to be rtt */
-		tp->mdev_us = m << 1;	/* make sure rto = 3*rtt */
-		tp->rttvar_us = max(tp->mdev_us, tcp_rto_min_us(sk));
-		tp->mdev_max_us = tp->rttvar_us;
+		srtt = m << 3;
+		tp->rttvar_us = max_t(u32, m << 1, tcp_rto_min_us(sk));
 		tp->rtt_seq = tp->snd_nxt;
 	}
 	tp->srtt_us = max(1U, srtt);
